@@ -41,7 +41,7 @@ namespace GameNet.Messaging
         {
             List<byte> data = new List<byte>();
 
-            data.AddRange(BitConverter.GetBytes(message.Type));
+            data.AddRange(BitConverter.GetBytes(message.TypeId));
             data.AddRange(message.Data);
 
             return data.ToArray();

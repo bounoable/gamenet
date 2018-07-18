@@ -8,7 +8,8 @@ namespace GameNet.Messaging
     public class MessageParser: IDataHandler
     {
         RecipientType recipient;
-        Dictionary<int, IMessageHandler> handlers = new Dictionary<int, IMessageHandler>();
+        int nextTypeId = 0;
+        Dictionary<int, MessageType> messageTypes = new Dictionary<int, MessageType>();
 
         /// <summary>
         /// Initialize a message parser.
@@ -20,11 +21,28 @@ namespace GameNet.Messaging
         }
 
         /// <summary>
-        /// Register a message handler.
+        /// Register a message type and return it's ID.
         /// </summary>
-        /// <param name="type">The message type id.</param>
+        /// <param name="objectType">The object type.</param>
         /// <param name="handler">The message handler.</param>
-        public void RegisterHandler(int type, IMessageHandler handler) => handlers[type] = handler;
+        /// <returns>The generated type id.</returns>
+        public int RegisterMessageType(Type objectType, IMessageHandler handler)
+        {
+            int typeId = nextTypeId;
+            nextTypeId++;
+
+            messageTypes[typeId] = new MessageType(objectType, handler);
+
+            return typeId;
+        }
+
+        /// <summary>
+        /// Register a message type and return it's ID.
+        /// </summary>
+        /// <param name="handler">The message handler.</param>
+        /// <returns>The generated type id.</returns>
+        public int RegisterMessageType<TMessage>(IMessageHandler handler)
+            => RegisterMessageType(typeof(TMessage), handler);
 
         /// <summary>
         /// Handle received data, parse the message and pass it to the registered handlers.
@@ -34,9 +52,11 @@ namespace GameNet.Messaging
         {
             IMessage message = ParseMessage(data);
 
-            if (handlers.TryGetValue(message.Type, out IMessageHandler handler)) {
-                handler.Handle(message, recipient);
+            if (!messageTypes.TryGetValue(message.TypeId, out MessageType type)) {
+                return;
             }
+
+            type.Handler.Handle(message, recipient);
         }
 
         /// <summary>

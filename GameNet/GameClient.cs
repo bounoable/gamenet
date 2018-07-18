@@ -6,6 +6,11 @@ namespace GameNet
 {
     public class GameClient: Client
     {
+        /// <summary>
+        /// Initialize the game client.
+        /// </summary>
+        /// <param name="messenger">The messenger.</param>
+        /// <param name="debugger">The client debugger.</param>
         public GameClient(Messenger messenger, IClientDebugger debugger = null): base(messenger, debugger)
         {}
 

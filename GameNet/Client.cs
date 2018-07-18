@@ -32,8 +32,11 @@ namespace GameNet
             this.debugger = debugger;
         }
 
+        /// <summary>
+        /// Register a data handler for the received data.
+        /// </summary>
+        /// <param name="handler">The data handler.</param>
         public void RegisterDataHandler(IDataHandler handler) => dataHandlers.Add(handler);
-        public void RemoveDataHandler(IDataHandler handler) => dataHandlers.Remove(handler);
 
         /// <summary>
         /// Connect to a server.

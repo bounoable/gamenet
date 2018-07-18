@@ -5,7 +5,7 @@ namespace GameNet.Messaging
         /// <summary>
         /// The message type id.
         /// </summary>
-        int Type { get; }
+        int TypeId { get; }
 
         /// <summary>
         /// The message data.

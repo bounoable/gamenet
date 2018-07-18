@@ -6,16 +6,16 @@ namespace GameNet.Messaging
         /// The message type id.
         /// </summary>
         /// <value></value>
-        public int Type { get; }
+        public int TypeId { get; }
 
         /// <summary>
         /// The message data.
         /// </summary>
         public byte[] Data { get; }
 
-        public Message(int type, byte[] data)
+        public Message(int typeId, byte[] data)
         {
-            Type = type;
+            TypeId = typeId;
             Data = data;
         }
     }
