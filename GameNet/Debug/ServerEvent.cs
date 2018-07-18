@@ -9,6 +9,5 @@ namespace GameNet.Debug
         ClientConnected,
         TcpClientConnected,
         UdpClientConnected,
-        LocalClientConnected,
     }
 }

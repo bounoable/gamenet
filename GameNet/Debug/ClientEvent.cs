@@ -6,6 +6,5 @@ namespace GameNet.Debug
         ConnectFailed,
         Disconnected,
         DisconnectFailed,
-        DataReceived,
     }
 }
