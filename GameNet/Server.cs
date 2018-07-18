@@ -117,7 +117,7 @@ namespace GameNet
         /// <param name="data">The event data.</param>
         void Debug(ServerEvent[] ev, object data) => Debug(ev, new EventData(data));
 
-        public void AddDataHandler(IDataHandler handler) => dataHandlers.Add(handler);
+        public void RegisterDataHandler(IDataHandler handler) => dataHandlers.Add(handler);
         public void RemoveDataHandler(IDataHandler handler) => dataHandlers.Remove(handler);
 
         /// <summary>

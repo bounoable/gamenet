@@ -32,7 +32,7 @@ namespace GameNet
             this.debugger = debugger;
         }
 
-        public void AddDataHandler(IDataHandler handler) => dataHandlers.Add(handler);
+        public void RegisterDataHandler(IDataHandler handler) => dataHandlers.Add(handler);
         public void RemoveDataHandler(IDataHandler handler) => dataHandlers.Remove(handler);
 
         /// <summary>

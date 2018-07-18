@@ -21,7 +21,7 @@ namespace GameNet
                 messageParser.RegisterHandler(handler.Key, handler.Value);
             }
 
-            client.AddDataHandler(messageParser);
+            client.RegisterDataHandler(messageParser);
 
             return client;
         }
@@ -36,7 +36,7 @@ namespace GameNet
                 messageParser.RegisterHandler(handler.Key, handler.Value);
             }
 
-            server.AddDataHandler(messageParser);
+            server.RegisterDataHandler(messageParser);
 
             return server;
         }
