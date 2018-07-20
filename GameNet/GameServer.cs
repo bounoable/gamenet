@@ -1,7 +1,9 @@
 using System.Net;
+using System.Linq;
 using GameNet.Debug;
 using GameNet.Messaging;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 
 namespace GameNet
 {
@@ -31,11 +33,11 @@ namespace GameNet
         /// Send a message to the clients.
         /// </summary>
         /// <param name="message">The message to send.</param>
-        public void Send(IMessage message)
+        async public Task Send(IMessage message)
         {
-            foreach (TcpClient client in tcpClients) {
-                messenger.Send(client.GetStream(), message);
-            }
+            await Task.WhenAll(tcpClients.Select(
+                client => messenger.Send(client.GetStream(), message)
+            ));
         }
     }
 }

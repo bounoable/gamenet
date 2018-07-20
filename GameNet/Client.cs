@@ -8,18 +8,22 @@ using System.Collections.Generic;
 
 namespace GameNet
 {
-    public class Client
+    public class Client: Endpoint
     {
         /// <summary>
         /// Indicates if the client is currently connected to the server.
         /// </summary>
         public bool Connected { get; private set; }
 
+        /// <summary>
+        /// Indicates if the client should receive data from the server.
+        /// </summary>
+        override protected bool ShouldReceiveData => Connected;
+
         protected Messenger messenger;
         protected IClientDebugger debugger;
 
         protected TcpClient server;
-        HashSet<IDataHandler> dataHandlers = new HashSet<IDataHandler>();
 
         /// <summary>
         /// Initialize the client for a client-server-connection.
@@ -31,12 +35,6 @@ namespace GameNet
             this.messenger = messenger;
             this.debugger = debugger;
         }
-
-        /// <summary>
-        /// Register a data handler for the received data.
-        /// </summary>
-        /// <param name="handler">The data handler.</param>
-        public void RegisterDataHandler(IDataHandler handler) => dataHandlers.Add(handler);
 
         /// <summary>
         /// Connect to a server.
@@ -70,7 +68,7 @@ namespace GameNet
                 Server = server
             });
 
-            ReceiveData();
+            Task.Run(() => ReceiveData(server));
         }
 
         /// <summary>
@@ -161,41 +159,10 @@ namespace GameNet
         void Debug(ClientEvent[] ev, object data) => Debug(ev, new EventData(data));
 
         /// <summary>
-        /// Let the client receive data from the server.
-        /// </summary>
-        async void ReceiveData()
-        {
-            NetworkStream stream = server.GetStream();
-
-            while (Connected && server.Connected) {
-                if (stream.CanRead && stream.DataAvailable) {
-                    var data = new byte[server.ReceiveBufferSize];
-
-                    await stream.ReadAsync(data, 0, server.ReceiveBufferSize);
-
-                    HandleReceivedData(data);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Call the registered data handlers.
-        /// </summary>
-        /// <param name="data">The received data.</param>
-        void HandleReceivedData(byte[] data)
-        {
-            Task.Run(() => {
-                foreach (IDataHandler handler in dataHandlers) {
-                    handler.Handle(data);
-                }
-            });
-        }
-
-        /// <summary>
         /// Send data to the server and return the sent data.
         /// </summary>
         /// <param name="data">The data to send.</param>
         /// <returns>The data that was sent.</returns>
-        async public Task<byte[]> Send(byte[] data) => await messenger.Send(server.GetStream(), data);
+        public Task<byte[]> Send(byte[] data) => messenger.Send(server.GetStream(), data);
     }
 }

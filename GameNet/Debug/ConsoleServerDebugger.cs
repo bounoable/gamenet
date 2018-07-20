@@ -25,7 +25,7 @@ namespace GameNet.Debug
                 Console.WriteLine($"Server start has failed: {e.Message}");
             });
 
-            On(ServerEvent.ServerStopped, data => {
+            On(ServerEvent.ServerStopped, () => {
                 Console.WriteLine($"Server has stopped.");
             });
 

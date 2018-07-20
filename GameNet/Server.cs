@@ -10,11 +10,16 @@ using System.Collections.Generic;
 
 namespace GameNet
 {
-    public class Server
+    public class Server: Endpoint
     {
         public IPAddress IPAddress { get; }
         public int Port { get; }
         public bool Active { get; private set; }
+
+        /// <summary>
+        /// Indicates if the server should receive data from the clients.
+        /// </summary>
+        override protected bool ShouldReceiveData => Active;
 
         public IEnumerable<TcpClient> TcpClients => tcpClients.ToArray();
 
@@ -23,7 +28,6 @@ namespace GameNet
         TcpListener socket;
 
         protected HashSet<TcpClient> tcpClients = new HashSet<TcpClient>();
-        HashSet<IDataHandler> dataHandlers = new HashSet<IDataHandler>();
 
         bool AcceptsClients => Active;
 
@@ -118,12 +122,6 @@ namespace GameNet
         void Debug(ServerEvent[] ev, object data) => Debug(ev, new EventData(data));
 
         /// <summary>
-        /// Register a data handler for the received data.
-        /// </summary>
-        /// <param name="handler">The data handler.</param>
-        public void RegisterDataHandler(IDataHandler handler) => dataHandlers.Add(handler);
-
-        /// <summary>
         /// Start the server.
         /// </summary>
         public void Start()
@@ -146,7 +144,7 @@ namespace GameNet
                 Server = this
             });
 
-            AcceptClients();
+            Task.Run(() => AcceptClients());
         }
 
         /// <summary>
@@ -176,33 +174,25 @@ namespace GameNet
         /// <summary>
         /// Start accepting clients.
         /// </summary>
-        async void AcceptClients()
+        async Task AcceptClients()
         {
             while (AcceptsClients) {
                 try {
-                    var client = await socket.AcceptTcpClientAsync();
-                    AddClient(client);
+                    TcpClient client = await socket.AcceptTcpClientAsync();
+
+                    tcpClients.Add(client);
+
+                    Task.Run(() => ReceiveDataFromClient(client));
+
+                    Debug(new[] {
+                        ServerEvent.ClientConnected,
+                        ServerEvent.TcpClientConnected
+                    }, new {
+                        Client = client,
+                        ConntectedAt = DateTime.Now
+                    });
                 } catch (ObjectDisposedException e) {}
             }
-        }
-
-        /// <summary>
-        /// Add a TCP client to the server.
-        /// </summary>
-        /// <param name="client">The TCP client.</param>
-        public void AddClient(TcpClient client)
-        {
-            tcpClients.Add(client);
-
-            ReceiveDataFromClient(client);
-
-            Debug(new[] {
-                ServerEvent.ClientConnected,
-                ServerEvent.TcpClientConnected
-            }, new {
-                Client = client,
-                ConntectedAt = DateTime.Now
-            });
         }
 
         /// <summary>
@@ -240,45 +230,17 @@ namespace GameNet
         /// Start receiving data from a client.
         /// </summary>
         /// <param name="client"></param>
-        void ReceiveDataFromClient(TcpClient client)
-        {
-            NetworkStream stream = client.GetStream();
-
-            Task.Run(() => {
-                while (Active && tcpClients.Contains(client)) {
-                    if (stream.CanRead && stream.DataAvailable) {
-                        var data = new byte[client.ReceiveBufferSize];
-
-                        stream.Read(data, 0, client.ReceiveBufferSize);
-
-                        HandleReceivedData(data);
-                    }
-                }
-            });
-        }
-
-        /// <summary>
-        /// Call the registered data handlers.
-        /// </summary>
-        /// <param name="data">The received data.</param>
-        void HandleReceivedData(byte[] data)
-        {
-            Task.Run(() => {
-                foreach (IDataHandler handler in dataHandlers) {
-                    handler.Handle(data);
-                }
-            });
-        }
+        Task ReceiveDataFromClient(TcpClient client) => ReceiveData(client);
 
         /// <summary>
         /// Send data to the clients.
         /// </summary>
         /// <param name="data">The data to send.</param>
-        public void Send(byte[] data)
+        async public Task Send(byte[] data)
         {
-            foreach (TcpClient client in tcpClients) {
-                messenger.Send(client.GetStream(), data);
-            }
+            await Task.WhenAll(tcpClients.Select(
+                client => messenger.Send(client.GetStream(), data)
+            ));
         }
     }
 }

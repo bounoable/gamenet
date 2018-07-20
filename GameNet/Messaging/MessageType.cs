@@ -2,10 +2,15 @@ using System;
 
 namespace GameNet.Messaging
 {
-    public class MessageType
+    public class MessageType: IMessageType
     {
         /// <summary>
-        /// The type of the objects of the messages.
+        /// The message type id.
+        /// </summary>
+        public int TypeId { get; set; }
+
+        /// <summary>
+        /// The object type.
         /// </summary>
         public Type ObjectType { get; }
 
@@ -15,14 +20,23 @@ namespace GameNet.Messaging
         public IMessageHandler Handler { get; }
 
         /// <summary>
+        /// The serializer for the object type.
+        /// </summary>
+        public IObjectSerializer Serializer { get; }
+
+        /// <summary>
         /// Define a message type for the message parser.
         /// </summary>
-        /// <param name="typeId">The type id.</param>
+        /// <paran name="typeId">The message type id.</param>
+        /// <paran name="objectType">The object type.</param>
         /// <param name="handler">The message handler.</param>
-        public MessageType(Type objectType, IMessageHandler handler)
+        /// <param name="serializer">The object serializer.</param>
+        public MessageType(int typeId, Type objectType, IMessageHandler handler, IObjectSerializer serializer)
         {
+            TypeId = typeId;
             ObjectType = objectType;
             Handler = handler;
+            Serializer = serializer;
         }
     }
 }

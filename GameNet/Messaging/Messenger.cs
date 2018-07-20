@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 
@@ -7,6 +8,13 @@ namespace GameNet.Messaging
 {
     public class Messenger
     {
+        MessageTypeConfig typeConfig;
+
+        public Messenger(MessageTypeConfig typeConfig)
+        {
+            this.typeConfig = typeConfig;
+        }
+
         /// <summary>
         /// Write data to a stream and return the written data.
         /// </summary>
@@ -28,8 +36,29 @@ namespace GameNet.Messaging
         /// <param name="recipient">The recipient. Usually something like a TCP client.</param>
         /// <param name="message">The message to send.</param>
         /// <returns>The data that was sent.</returns>
-        async public Task<byte[]> Send(Stream recipient, IMessage message)
-            => await Send(recipient, PrepareMessage(message));
+        public Task<byte[]> Send(Stream recipient, IMessage message)
+            => Send(recipient, PrepareMessage(message));
+        
+        /// <summary>
+        /// Write a message to a stream and return the written data.
+        /// The object will automatically be serialized to a message by the registered serializer.
+        /// </summary>
+        /// <param name="recipient">The recipient. Usually something like a TCP client.</param>
+        /// <param name="object">The object to send.</param>
+        /// <returns>The data that was sent.</returns>
+        async public Task<byte[]> Send(Stream recipient, object obj)
+        {
+            IMessageType type = typeConfig.GetTypeByObject(obj);
+
+            if (type == null) {
+                return new byte[0];
+            }
+
+            byte[] data = type.Serializer.Serialize(obj);
+            Message message = new Message(type.TypeId, data);
+
+            return await Send(recipient, message);
+        }
 
         /// <summary>
         /// Transform a message to a byte array that contains
@@ -41,10 +70,17 @@ namespace GameNet.Messaging
         {
             List<byte> data = new List<byte>();
 
-            data.AddRange(BitConverter.GetBytes(message.TypeId));
-            data.AddRange(message.Data);
+            data.AddRange(ToLittleEndian(BitConverter.GetBytes(message.TypeId)));
+            data.AddRange(ToLittleEndian(message.Data));
 
             return data.ToArray();
         }
+
+        /// <summary>
+        /// Transform a byte array to little endian if the operating system uses big endian.
+        /// </summary>
+        /// <param name="data">The byte array.</param>
+        /// <returns>The corrected byte array.</returns>
+        byte[] ToLittleEndian(byte[] data) => BitConverter.IsLittleEndian ? data : data.Reverse().ToArray();
     }
 }

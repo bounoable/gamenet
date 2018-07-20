@@ -8,13 +8,7 @@ namespace GameNet
 {
     public class GameNetFactory
     {
-        Dictionary<Type, IMessageHandler> messageHandlers = new Dictionary<Type, IMessageHandler>();
-
-        /// <summary>
-        /// Register a message handler for the servers and clients.
-        /// </summary>
-        /// <param name="handler">The message handler.</param>
-        public void RegisterMessageType<TMessage>(IMessageHandler handler) => messageHandlers[typeof(TMessage)] = handler;
+        MessageTypeConfig MessageTypeConfig { get; } = new MessageTypeConfig();
 
         /// <summary>
         /// Create a GameClient.
@@ -23,13 +17,9 @@ namespace GameNet
         /// <returns>The GameClient.</returns>
         public GameClient CreateGameClient(IClientDebugger debugger = null)
         {
-            Messenger messenger = new Messenger();
+            Messenger messenger = new Messenger(MessageTypeConfig);
             GameClient client = new GameClient(messenger, debugger);
-            MessageParser messageParser = new MessageParser(RecipientType.Client);
-
-            foreach (KeyValuePair<Type, IMessageHandler> handler in messageHandlers) {
-                messageParser.RegisterMessageType(handler.Key, handler.Value);
-            }
+            MessageParser messageParser = new MessageParser(MessageTypeConfig, RecipientType.Client);
 
             client.RegisterDataHandler(messageParser);
 
@@ -45,13 +35,9 @@ namespace GameNet
         /// <returns>The GameServer.</returns>
         public GameServer CreateGameServer(IPAddress ipAddress, int port, IServerDebugger debugger = null)
         {
-            Messenger messenger = new Messenger();
+            Messenger messenger = new Messenger(MessageTypeConfig);
             GameServer server = new GameServer(ipAddress, port, messenger, debugger);
-            MessageParser messageParser = new MessageParser(RecipientType.Server);
-
-            foreach (KeyValuePair<Type, IMessageHandler> handler in messageHandlers) {
-                messageParser.RegisterMessageType(handler.Key, handler.Value);
-            }
+            MessageParser messageParser = new MessageParser(MessageTypeConfig, RecipientType.Server);
 
             server.RegisterDataHandler(messageParser);
 

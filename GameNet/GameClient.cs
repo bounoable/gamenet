@@ -19,6 +19,6 @@ namespace GameNet
         /// </summary>
         /// <param name="message">The message to send.</param>
         /// <returns>The data that was sent.</returns>
-        async public Task<byte[]> Send(IMessage message) => await messenger.Send(server.GetStream(), message);
+        public Task<byte[]> Send(IMessage message) => messenger.Send(server.GetStream(), message);
     }
 }

@@ -7,42 +7,19 @@ namespace GameNet.Messaging
 {
     public class MessageParser: IDataHandler
     {
+        MessageTypeConfig typeConfig;
         RecipientType recipient;
-        int nextTypeId = 0;
-        Dictionary<int, MessageType> messageTypes = new Dictionary<int, MessageType>();
 
         /// <summary>
         /// Initialize a message parser.
         /// </summary>
+        /// <param name="typeConfig">The message type config.</param>
         /// <param name="recipient">The recipient type.</param>
-        public MessageParser(RecipientType recipient)
+        public MessageParser(MessageTypeConfig typeConfig, RecipientType recipient)
         {
+            this.typeConfig = typeConfig;
             this.recipient = recipient;
         }
-
-        /// <summary>
-        /// Register a message type and return it's ID.
-        /// </summary>
-        /// <param name="objectType">The object type.</param>
-        /// <param name="handler">The message handler.</param>
-        /// <returns>The generated type id.</returns>
-        public int RegisterMessageType(Type objectType, IMessageHandler handler)
-        {
-            int typeId = nextTypeId;
-            nextTypeId++;
-
-            messageTypes[typeId] = new MessageType(objectType, handler);
-
-            return typeId;
-        }
-
-        /// <summary>
-        /// Register a message type and return it's ID.
-        /// </summary>
-        /// <param name="handler">The message handler.</param>
-        /// <returns>The generated type id.</returns>
-        public int RegisterMessageType<TMessage>(IMessageHandler handler)
-            => RegisterMessageType(typeof(TMessage), handler);
 
         /// <summary>
         /// Handle received data, parse the message and pass it to the registered handlers.
@@ -51,8 +28,9 @@ namespace GameNet.Messaging
         public void Handle(byte[] data)
         {
             IMessage message = ParseMessage(data);
+            IMessageType type = typeConfig.GetTypeById(message.TypeId);
 
-            if (!messageTypes.TryGetValue(message.TypeId, out MessageType type)) {
+            if (type == null) {
                 return;
             }
 
