@@ -28,12 +28,7 @@ namespace GameNet.Messaging
                 return;
             }
 
-            byte[] data = message.Data
-                .Skip(sizeof(int))
-                .Take(message.Data.Length - sizeof(int))
-                .ToArray();
-
-            HandleObject(ParseObject(data));
+            HandleObject(ParseObject(message.Data));
         }
 
         /// <summary>
