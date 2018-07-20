@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 
 namespace GameNet.Messaging
@@ -69,17 +70,11 @@ namespace GameNet.Messaging
         /// <returns>The type id.</returns>
         int GetNextTypeId()
         {
-            int nextId = 0;
+            List<int> ids = messageTypes.Keys.ToList();
 
-            foreach (KeyValuePair<int, IMessageType> entry in messageTypes) {
-                int id = entry.Value.TypeId;
+            ids.Sort((a, b) => a.CompareTo(b));
 
-                if (id > nextId) {
-                    nextId = id;
-                }
-            }
-
-            return nextId;
+            return ids.Count > 0 ? ids.Last() + 1 : 0;
         }
         
         /// <summary>

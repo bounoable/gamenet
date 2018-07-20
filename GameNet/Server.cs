@@ -229,7 +229,7 @@ namespace GameNet
         /// <summary>
         /// Start receiving data from a client.
         /// </summary>
-        /// <param name="client"></param>
+        /// <param name="client">The TCP client.</param>
         Task ReceiveDataFromClient(TcpClient client) => ReceiveData(client);
 
         /// <summary>
