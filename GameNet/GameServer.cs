@@ -39,5 +39,18 @@ namespace GameNet
                 client => messenger.Send(client.GetStream(), message)
             ));
         }
+
+        /// <summary>
+        /// Send a message to all clients.
+        /// The object will automatically be serialized to a message by the registered serializer.
+        /// </summary>
+        /// <param name="object">The object to send.</param>
+        /// <returns>The data that was sent.</returns>
+        async public Task Send(object obj)
+        {
+            await Task.WhenAll(tcpClients.Select(
+                client => messenger.Send(client.GetStream(), obj)
+            ));
+        }
     }
 }

@@ -8,7 +8,7 @@ namespace GameNet
 {
     public class GameNetFactory
     {
-        MessageTypeConfig MessageTypeConfig { get; } = new MessageTypeConfig();
+        public MessageTypeConfig MessageTypeConfig { get; } = new MessageTypeConfig();
 
         /// <summary>
         /// Create a GameClient.

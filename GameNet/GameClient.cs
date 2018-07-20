@@ -20,5 +20,14 @@ namespace GameNet
         /// <param name="message">The message to send.</param>
         /// <returns>The data that was sent.</returns>
         public Task<byte[]> Send(IMessage message) => messenger.Send(server.GetStream(), message);
+
+        /// <summary>
+        /// Write a message to the server and return the written data.
+        /// The object will automatically be serialized to a message by the registered serializer.
+        /// </summary>
+        /// <param name="recipient">The recipient. Usually something like a TCP client.</param>
+        /// <param name="object">The object to send.</param>
+        /// <returns>The data that was sent.</returns>
+        public Task<byte[]> Send(object obj) => messenger.Send(server.GetStream(), obj);
     }
 }
