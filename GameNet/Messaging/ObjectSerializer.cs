@@ -1,32 +1,140 @@
+using System;
+
 namespace GameNet.Messaging
 {
-    abstract public class ObjectSerializer<TObject>: IObjectSerializer
+    abstract public class ObjectSerializer<T>: IObjectSerializer<T>
     {
         /// <summary>
         /// Serialize an object into a byte array.
         /// </summary>
         /// <param name="obj">The object to serialize.</param>
         /// <returns>The serialized byte array.</returns>
-        public byte[] Serialize(object obj)
-        {
-            if (obj.GetType() != typeof(TObject)) {
-                return null;
-            }
-
-            return GetBytes((TObject)obj);
-        }
+        abstract public byte[] Serialize(T obj);
 
         /// <summary>
-        /// Serialize an object into a byte array.
+        /// Deserialize bytes back into the object.
         /// </summary>
-        /// <param name="obj">The object to serialize.</param>
-        /// <returns>The serialized byte array.</returns>
-        abstract protected byte[] GetBytes(TObject obj);
+        /// <param name="data">The byte array</param>
+        /// <typeparam name="T">The object type.</typeparam>
+        /// <returns>The deserialized object.</returns>
+        abstract public T Deserialize(byte[] data);
 
         /// <summary>
         /// Initialize a data builder.
         /// </summary>
         /// <returns>The data builder.</returns>
         protected DataBuilder Build() => new DataBuilder();
+
+        /// <summary>
+        /// Pull a byte from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="offset">The offset.</param>
+        /// <returns>The byte.</returns>
+        public static byte PullByte(ref byte[] data) => DataHelper.PullByte(ref data);
+
+        /// <summary>
+        /// Pull an sbyte from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="offset">The offset.</param>
+        /// <returns>The sbyte.</returns>
+        public static sbyte PullSByte(ref byte[] data) => DataHelper.PullSByte(ref data);
+
+        /// <summary>
+        /// Pull a boolean from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="offset">The offset.</param>
+        /// <returns>The boolean.</returns>
+        protected static bool PullBool(ref byte[] data) => DataHelper.PullBool(ref data);
+
+        /// <summary>
+        /// Pull a short (16 bit int) from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="offset">The offset.</param>
+        /// <returns>The short (16 bit int).</returns>
+        protected static short PullShort(ref byte[] data) => DataHelper.PullShort(ref data);
+
+        /// <summary>
+        /// Pull a ushort (unsigned 16 bit int) from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="offset">The offset.</param>
+        /// <returns>The ushort (unsigned 16 bit int).</returns>
+        protected static ushort PullUShort(ref byte[] data) => DataHelper.PullUShort(ref data);
+
+        /// <summary>
+        /// Pull an integer from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="offset">The offset.</param>
+        /// <returns>The integer.</returns>
+        protected static int PullInt(ref byte[] data) => DataHelper.PullInt(ref data);
+
+        /// <summary>
+        /// Pull an integer from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="offset">The offset.</param>
+        /// <returns>The integer.</returns>
+        protected static uint PullUInt(ref byte[] data) => DataHelper.PullUInt(ref data);
+
+        /// <summary>
+        /// Pull a long from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="offset">The offset.</param>
+        /// <returns>The long.</returns>
+        public static long PullLong(ref byte[] data) => DataHelper.PullLong(ref data);
+
+        /// <summary>
+        /// Pull a ulong from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="offset">The offset.</param>
+        /// <returns>The ulong.</returns>
+        public static ulong PullULong(ref byte[] data) => DataHelper.PullULong(ref data);
+
+        /// <summary>
+        /// Pull a float from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="offset">The offset.</param>
+        /// <returns>The float.</returns>
+        protected static float PullFloat(ref byte[] data) => DataHelper.PullFloat(ref data);
+
+        /// <summary>
+        /// Pull a double from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="offset">The offset.</param>
+        /// <returns>The double.</returns>
+        protected static double GetDouble(ref byte[] data) => DataHelper.PullDouble(ref data);
+
+        /// <summary>
+        /// Pull a char from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="offset">The offset.</param>
+        /// <returns>The char.</returns>
+        protected static char PullChar(ref byte[] data) => DataHelper.PullChar(ref data);
+
+        /// <summary>
+        /// Pull a string from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="offset">The offset.</param>
+        /// <returns>The string.</returns>
+        protected static string PullString(ref byte[] data) => DataHelper.PullString(ref data);
+
+        /// <summary>
+        /// Pull an enum value from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="offset">The offset.</param>
+        /// <returns>The enum value.</returns>
+        protected static TEnum PullEnum<TEnum>(ref byte[] data) where TEnum: Enum => DataHelper.PullEnum<TEnum>(ref data);
     }
 }

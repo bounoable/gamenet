@@ -48,13 +48,18 @@ namespace GameNet.Messaging
         /// <returns>The data that was sent.</returns>
         async public Task<byte[]> Send(Stream recipient, object obj)
         {
-            IMessageType type = typeConfig.GetTypeByObject(obj);
+            IMessageType<object> type = typeConfig.GetTypeByObject(obj);
 
             if (type == null) {
                 return new byte[0];
             }
 
             byte[] data = type.Serializer.Serialize(obj);
+
+            if (data == null) {
+                return new byte[0];
+            }
+
             Message message = new Message(type.TypeId, data);
 
             return await Send(recipient, message);

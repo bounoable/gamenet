@@ -55,6 +55,10 @@ namespace GameNet
             try {
                 server.Connect(ipAddress, port);
             } catch (Exception e) {
+                if (debugger == null) {
+                    throw e;
+                }
+                
                 Debug(ClientEvent.ConnectFailed, new {
                     Exception = e
                 });

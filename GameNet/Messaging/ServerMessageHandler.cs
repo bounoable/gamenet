@@ -1,6 +1,6 @@
 namespace GameNet.Messaging
 {
-    abstract public class ServerMessageHandler<TMessage>: MessageHandler<TMessage>
+    abstract public class ServerMessageHandler<T>: MessageHandler<T>
     {
         public ServerMessageHandler(): base(RecipientType.Client)
         {}

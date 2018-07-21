@@ -23,6 +23,8 @@ namespace GameNet
 
         public IEnumerable<TcpClient> TcpClients => tcpClients.ToArray();
 
+        public event EventHandler<ClientConnectedEventArgs> ClientConnected;
+
         protected Messenger messenger;
         IServerDebugger debugger;
         TcpListener socket;
@@ -131,6 +133,10 @@ namespace GameNet
             try {
                 socket.Start();
             } catch (SocketException e) {
+                if (debugger == null) {
+                    throw e;
+                }
+
                 Debug(ServerEvent.ServerStartFailed, new {
                     Exception = e
                 });
@@ -183,6 +189,8 @@ namespace GameNet
                     tcpClients.Add(client);
 
                     Task.Run(() => ReceiveDataFromClient(client));
+
+                    ClientConnected(this, new ClientConnectedEventArgs(client));
 
                     Debug(new[] {
                         ServerEvent.ClientConnected,
@@ -239,6 +247,26 @@ namespace GameNet
         async public Task Send(byte[] data)
         {
             await Task.WhenAll(tcpClients.Select(
+                client => messenger.Send(client.GetStream(), data)
+            ));
+        }
+
+        /// <summary>
+        /// Send data to a specific client and return the sent bytes.
+        /// </summary>
+        /// <param name="data">The data to send.</param>
+        /// <returns>The sent bytes.</returns>
+        async public Task<byte[]> SendTo(TcpClient client, byte[] data)
+            => await messenger.Send(client.GetStream(), data);
+        
+        /// <summary>
+        /// Send data to specific clients.
+        /// </summary>
+        /// <param name="clients">The recipients.</param>
+        /// <param name="data">The data to send.</param>
+        async public Task SendTo(IEnumerable<TcpClient> clients, byte[] data)
+        {
+            await Task.WhenAll(clients.Select(
                 client => messenger.Send(client.GetStream(), data)
             ));
         }

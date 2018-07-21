@@ -2,7 +2,7 @@ using System;
 
 namespace GameNet.Messaging
 {
-    public interface IMessageType
+    public interface IMessageType<T>
     {
         /// <summary>
         /// The message type id.
@@ -10,18 +10,13 @@ namespace GameNet.Messaging
         int TypeId { get; set; }
 
         /// <summary>
-        /// The object type.
-        /// </summary>
-        Type ObjectType { get; }
-
-        /// <summary>
         /// The handler for the message type.
         /// </summary>
-        IMessageHandler Handler { get; }
+        IMessageHandler<T> Handler { get; }
 
         /// <summary>
         /// The serializer for the object type.
         /// </summary>
-        IObjectSerializer Serializer { get; }
+        IObjectSerializer<T> Serializer { get; }
     }
 }

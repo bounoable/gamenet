@@ -13,17 +13,19 @@ namespace GameNet.Messaging
     
     public class MessageTypeConfig
     {
-        Dictionary<int, IMessageType> messageTypes = new Dictionary<int, IMessageType>();
+        int nextTypeId = 0;
+        Dictionary<Type, object> messageTypes = new Dictionary<Type, object>();
 
         /// <summary>
         /// Register a message type.
         /// </summary>
         /// <param name="type">The message type.</param>
-        public void RegisterMessageType(IMessageType type, TypeIdConflict conflict = TypeIdConflict.Override)
+        /// <param name="conflict">The type id conflict option.</param>
+        public void RegisterMessageType<T>(IMessageType<T> type, TypeIdConflict conflict = TypeIdConflict.Override)
         {
-            if (messageTypes.ContainsKey(type.TypeId)) {
+            if (messageTypes.ContainsKey(typeof(T))) {
                 if (conflict == TypeIdConflict.Override) {
-                    messageTypes[type.TypeId] = type;
+                    messageTypes[typeof(T)] = type;
                     return;
                 }
 
@@ -36,33 +38,24 @@ namespace GameNet.Messaging
                 }
             }
 
-            messageTypes[type.TypeId] = type;
+            messageTypes[typeof(T)] = type;
         }
 
         /// <summary>
         /// Register a message type and return it's ID.
         /// </summary>
-        /// <param name="objectType">The object type.</param>
-        /// <param name="handler">The message handler.</param>
         /// <param name="serializer">The object serializer.</param>
+        /// <param name="handler">The object handler.</param>
+        /// <param name="conflict">The type id conflict option.</param>
         /// <returns>The generated type id.</returns>
-        public int RegisterMessageType(Type objectType, IMessageHandler handler, IObjectSerializer serializer)
+        public int RegisterMessageType<T>(IObjectSerializer<T> serializer, IMessageHandler<T> handler, TypeIdConflict conflict = TypeIdConflict.Override)
         {
             int typeId = GetNextTypeId();
 
-            RegisterMessageType(new MessageType(typeId, objectType, handler, serializer));
+            RegisterMessageType(new MessageType<T>(typeId, handler, serializer));
 
             return typeId;
         }
-
-        /// <summary>
-        /// Register a message type and return it's ID.
-        /// </summary>
-        /// <param name="handler">The message handler.</param>
-        /// <param name="serializer">The object serializer.</param>
-        /// <returns>The generated type id.</returns>
-        public int RegisterMessageType<TObject>(IMessageHandler handler, IObjectSerializer serializer)
-            => RegisterMessageType(typeof(TObject), handler, serializer);
         
         /// <summary>
         /// Get the next unused type id for the message type registration.
@@ -70,26 +63,46 @@ namespace GameNet.Messaging
         /// <returns>The type id.</returns>
         int GetNextTypeId()
         {
-            List<int> ids = messageTypes.Keys.ToList();
+            int id = nextTypeId;
+            nextTypeId++;
 
-            ids.Sort((a, b) => a.CompareTo(b));
-
-            return ids.Count > 0 ? ids.Last() + 1 : 0;
+            return id;
         }
+
+        /// <summary>
+        /// Get a message type by it's object type.
+        /// </summary>
+        /// <param name="objType">The object type.</param>
+        /// <returns>The message type.</returns>
+        public IMessageType<dynamic> GetType(Type objType)
+        {
+            if (messageTypes.TryGetValue(objType, out object type)) {
+                return (MessageType<dynamic>)type;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Get a message type by it's object type.
+        /// </summary>
+        /// <typeparam name="T">The object type.</typeparam>
+        /// <returns>The message type.</returns>
+        public IMessageType<T> GetType<T>() => (IMessageType<T>)GetType(typeof(T));
         
         /// <summary>
         /// Get a message type by it's id.
         /// </summary>
         /// <param name="id">The type id.</param>
         /// <returns>The message type.</returns>
-        public IMessageType GetTypeById(int id)
+        public IMessageType<dynamic> GetTypeById(int id)
         {
-            if (messageTypes.TryGetValue(id, out IMessageType type)) {
-                if (id != type.TypeId) {
-                    return null;
-                }
+            foreach (KeyValuePair<Type, object> entry in messageTypes) {
+                IMessageType<object> type = (IMessageType<object>)entry.Value;
 
-                return type;
+                if (type.TypeId == id) {
+                    return type;
+                }
             }
 
             return null;
@@ -99,14 +112,12 @@ namespace GameNet.Messaging
         /// Get the message type of an object.
         /// </summary>
         /// <param name="obj">The object.</param>
-        public IMessageType GetTypeByObject(object obj)
+        public IMessageType<dynamic> GetTypeByObject(object obj)
         {
-            Type type = obj.GetType();
+            Type objType = obj.GetType();
 
-            foreach (KeyValuePair<int, IMessageType> entry in messageTypes) {
-                if (entry.Value.ObjectType == type) {
-                    return entry.Value;
-                }
+            if (messageTypes.TryGetValue(objType, out object type)) {
+                return (IMessageType<dynamic>)type;
             }
 
             return null;
