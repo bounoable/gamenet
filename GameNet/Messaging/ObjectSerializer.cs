@@ -2,14 +2,28 @@ using System;
 
 namespace GameNet.Messaging
 {
-    abstract public class ObjectSerializer<T>: IObjectSerializer<T>
+    abstract public class ObjectSerializer<T>: IObjectSerializer
     {
         /// <summary>
         /// Serialize an object into a byte array.
         /// </summary>
         /// <param name="obj">The object to serialize.</param>
         /// <returns>The serialized byte array.</returns>
-        abstract public byte[] Serialize(T obj);
+        public byte[] Serialize(object obj)
+        {
+            if (obj.GetType() != typeof(T)) {
+                return new byte[0];
+            }
+
+            return GetBytes((T)obj);
+        }
+
+        /// <summary>
+        /// Serialize an object into a byte array.
+        /// </summary>
+        /// <param name="obj">The object to serialize.</param>
+        /// <returns>The serialized byte array.</returns>
+        abstract public byte[] GetBytes(T obj);
 
         /// <summary>
         /// Deserialize bytes back into the object.
@@ -17,7 +31,15 @@ namespace GameNet.Messaging
         /// <param name="data">The byte array</param>
         /// <typeparam name="T">The object type.</typeparam>
         /// <returns>The deserialized object.</returns>
-        abstract public T Deserialize(byte[] data);
+        public object Deserialize(byte[] data) => (object)GetObject(data);
+
+        /// <summary>
+        /// Deserialize bytes back into the object.
+        /// </summary>
+        /// <param name="data">The byte array</param>
+        /// <typeparam name="T">The object type.</typeparam>
+        /// <returns>The deserialized object.</returns>
+        abstract public T GetObject(byte[] data);
 
         /// <summary>
         /// Initialize a data builder.

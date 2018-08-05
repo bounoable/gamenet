@@ -1,11 +1,11 @@
 namespace GameNet.Messaging
 {
-    public interface IMessage
+    public interface IPacket
     {
         /// <summary>
         /// The message type id.
         /// </summary>
-        int TypeId { get; }
+        int MessageTypeId { get; }
 
         /// <summary>
         /// The message data.

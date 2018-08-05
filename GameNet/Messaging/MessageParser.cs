@@ -27,14 +27,14 @@ namespace GameNet.Messaging
         /// <param name="data">The received data.</param>
         public void Handle(byte[] data)
         {
-            IMessage message = ParseMessage(data);
-            IMessageType<object> type = typeConfig.GetTypeById(message.TypeId);
+            IPacket packet = ParsePacket(data);
+            IMessageType type = typeConfig.GetTypeById(packet.MessageTypeId);
 
             if (type == null) {
                 return;
             }
 
-            object obj = type.Serializer.Deserialize(data);
+            object obj = type.Serializer.Deserialize(data.Skip(sizeof(int)).ToArray());
 
             type.Handler.Handle(obj, recipient);
         }
@@ -44,12 +44,12 @@ namespace GameNet.Messaging
         /// </summary>
         /// <param name="raw">The received data.</param>
         /// <returns>The parsed message.</returns>
-        IMessage ParseMessage(byte[] raw)
+        IPacket ParsePacket(byte[] raw)
         {
             int type = DataHelper.GetInt(raw);
-            byte[] data = raw.Skip(4).Take(raw.Length - 4).ToArray();
+            byte[] data = raw.Skip(sizeof(int)).ToArray();
 
-            return new Message(type, data);
+            return new Packet(type, data);
         }
     }
 }

@@ -2,32 +2,25 @@ using System;
 
 namespace GameNet.Messaging
 {
-    public class MessageType<T>: IMessageType<T>
+    public class MessageType<T>: IMessageType
     {
-        /// <summary>
-        /// The message type id.
-        /// </summary>
-        public int TypeId { get; set; }
-
         /// <summary>
         /// The message handler.
         /// </summary>
-        public IMessageHandler<T> Handler { get; }
+        public IMessageHandler Handler { get; }
 
         /// <summary>
         /// The serializer for the object type.
         /// </summary>
-        public IObjectSerializer<T> Serializer { get; }
+        public IObjectSerializer Serializer { get; }
 
         /// <summary>
         /// Define a message type for the message parser.
         /// </summary>
-        /// <paran name="typeId">The message type id.</param>
-        /// <param name="handler">The object handler.</param>
         /// <param name="serializer">The object serializer.</param>
-        public MessageType(int typeId, IMessageHandler<T> handler, IObjectSerializer<T> serializer)
+        /// <param name="handler">The object handler.</param>
+        public MessageType(IObjectSerializer serializer, IMessageHandler handler)
         {
-            TypeId = typeId;
             Handler = handler;
             Serializer = serializer;
         }

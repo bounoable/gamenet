@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using GameNet.Debug;
+using GameNet.Messages;
 using GameNet.Messaging;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -15,25 +16,28 @@ namespace GameNet
         /// </summary>
         public bool Connected { get; private set; }
 
+        protected IPEndPoint ServerUdpEndpoint { get; private set; }
+
         /// <summary>
         /// Indicates if the client should receive data from the server.
         /// </summary>
         override protected bool ShouldReceiveData => Connected;
 
-        protected Messenger messenger;
-        protected IClientDebugger debugger;
-
-        protected TcpClient server;
+        protected Messenger _messenger;
+        protected TcpClient _tcpServer = new TcpClient();
 
         /// <summary>
         /// Initialize the client for a client-server-connection.
         /// </summary>
+        /// <param name="config">The configuration.</param>
         /// <param name="messenger">The messenger.</param>
-        /// <param name="debugger">The client debugger.</param>
-        public Client(Messenger messenger, IClientDebugger debugger = null)
+        public Client(NetworkConfiguration config, Messenger messenger): base(config)
         {
-            this.messenger = messenger;
-            this.debugger = debugger;
+            if (messenger == null) {
+                throw new ArgumentNullException("messenger");
+            }
+
+            _messenger = messenger;
         }
 
         /// <summary>
@@ -50,29 +54,11 @@ namespace GameNet
             ValidateIPAddress(ipAddress);
             ValidatePort(port);
 
-            server = new TcpClient();
-
-            try {
-                server.Connect(ipAddress, port);
-            } catch (Exception e) {
-                if (debugger == null) {
-                    throw e;
-                }
-                
-                Debug(ClientEvent.ConnectFailed, new {
-                    Exception = e
-                });
-
-                return;
-            }
+            _tcpServer.Connect(ipAddress, port);
 
             Connected = true;
 
-            Debug(ClientEvent.Connected, new {
-                Server = server
-            });
-
-            Task.Run(() => ReceiveData(server));
+            Task.Run(() => ReceiveData(_tcpServer));
         }
 
         /// <summary>
@@ -88,16 +74,13 @@ namespace GameNet
         public void Disconnect()
         {
             if (!Connected) {
-                Debug(ClientEvent.DisconnectFailed);
-
                 return;
             }
 
-            server.Close();
-            server = null;
+            _tcpServer.Close();
+            _tcpServer = null;
+            _udpClient.Close();
             Connected = false;
-
-            Debug(ClientEvent.Disconnected);
         }
 
         /// <summary>
@@ -123,50 +106,85 @@ namespace GameNet
         }
 
         /// <summary>
-        /// Trigger a debug event.
+        /// Register the server's UDP port.
         /// </summary>
-        /// <param name="ev">The event type.</param>
-        /// <param name="data">The event data.</param>
-        void Debug(ClientEvent ev, EventData data = null)
+        /// <param name="message">The UDP port message from the server.</param>
+        public void RegisterServerUdpPort(UdpPortMessage message)
         {
-            if (debugger != null) {
-                debugger.Handle(ev, data);
-            }
+            string secret = message.Secret;
+
+            ServerUdpEndpoint = (IPEndPoint)_tcpServer.Client.RemoteEndPoint;
+            ServerUdpEndpoint.Port = message.Port;
+
+            Task.Run(() => ReceiveData(_udpClient, ServerUdpEndpoint));
+            Task.Run(() => SendUdpPortToServer(secret));
         }
 
         /// <summary>
-        /// Trigger a debug event.
+        /// Send the client's local UDP port to the server.
         /// </summary>
-        /// <param name="ev">The event type.</param>
-        /// <param name="data">The event data.</param>
-        void Debug(ClientEvent ev, object data) => Debug(ev, new EventData(data));
-
-        /// <summary>
-        /// Trigger multiple debug events.
-        /// </summary>
-        /// <param name="ev">The event types.</param>
-        /// <param name="data">The event data.</param>
-        void Debug(ClientEvent[] ev, EventData data = null)
-        {
-            if (debugger != null) {
-                foreach (ClientEvent evnt in ev) {
-                    Debug(evnt, data);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Trigger multiple debug events.
-        /// </summary>
-        /// <param name="ev">The event types.</param>
-        /// <param name="data">The event data.</param>
-        void Debug(ClientEvent[] ev, object data) => Debug(ev, new EventData(data));
-
+        /// <param name="secret">The UDP port message secret.</param>
+        /// <returns>The sent bytes.</returns>
+        async Task<byte[]> SendUdpPortToServer(string secret)
+            => await Send<UdpPortMessage>(new ClientUdpPortMessage(this, secret));
+        
         /// <summary>
         /// Send data to the server and return the sent data.
         /// </summary>
         /// <param name="data">The data to send.</param>
+        /// <param name="protocol">The protocol to use.</param>
         /// <returns>The data that was sent.</returns>
-        public Task<byte[]> Send(byte[] data) => messenger.Send(server.GetStream(), data);
+        async public Task<byte[]> Send(byte[] data, ProtocolType protocol = ProtocolType.Tcp)
+        {
+            switch (protocol) {
+                case ProtocolType.Udp:
+                    if (ServerUdpEndpoint == null)
+                        return new byte[0];
+
+                    return await _messenger.SendBytes(_udpClient, ServerUdpEndpoint, data);
+
+                case ProtocolType.Tcp:
+                default:
+                    return await _messenger.SendBytes(_tcpServer.GetStream(), data);
+            }
+        }
+
+        /// <summary>
+        /// Send a packet to the server and return the sent data.
+        /// </summary>
+        /// <param name="packet">The packet to send.</param>
+        /// <param name="protocol">The protocol to use.</param>
+        /// <returns>The data that was sent.</returns>
+        public Task<byte[]> Send(IPacket packet, ProtocolType protocol = ProtocolType.Tcp)
+        {
+            switch (protocol) {
+                case ProtocolType.Udp:
+                    return _messenger.SendPacket(_udpClient, ServerUdpEndpoint, packet);
+
+                case ProtocolType.Tcp:
+                default:
+                    return _messenger.SendPacket(_tcpServer.GetStream(), packet);
+            }
+        }
+
+        /// <summary>
+        /// Send an object to the server and return the written data.
+        /// The object will automatically be serialized to a message by the registered serializer.
+        /// </summary>
+        /// <param name="recipient">The recipient. Usually something like a TCP client.</param>
+        /// <param name="object">The object to send.</param>
+        /// <param name="protocol">The protocol to use.</param>
+        /// <returns>The data that was sent.</returns>
+        public Task<byte[]> Send<T>(T obj, ProtocolType protocol = ProtocolType.Tcp)
+        {
+            switch (protocol) {
+                case ProtocolType.Udp:
+                    return _messenger.Send<T>(_udpClient, ServerUdpEndpoint, obj);
+
+                case ProtocolType.Tcp:
+                default:
+                    return _messenger.Send<T>(_tcpServer.GetStream(), obj);
+            }
+        }
     }
 }

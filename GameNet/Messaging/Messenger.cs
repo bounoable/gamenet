@@ -1,6 +1,8 @@
 using System;
 using System.IO;
+using System.Net;
 using System.Linq;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 
@@ -21,7 +23,7 @@ namespace GameNet.Messaging
         /// <param name="recipient">The recipient. Usually something like a TCP/UDP client.</param>
         /// <param name="data">The data to send.</param>
         /// <returns>The data that was sent.</returns>
-        async public Task<byte[]> Send(Stream recipient, byte[] data)
+        async public Task<byte[]> SendBytes(Stream recipient, byte[] data)
         {
             if (recipient.CanWrite) {
                 await recipient.WriteAsync(data, 0, data.Length);
@@ -31,52 +33,129 @@ namespace GameNet.Messaging
         }
 
         /// <summary>
-        /// Write a message to a stream and return the written data.
+        /// Send data to an endpoint over a UDP client and return the sent data.
+        /// </summary>
+        /// <param name="client">The udp client.</param>
+        /// <param name="recipient">The recipient.</param>
+        /// <param name="data">The data to send.</param>
+        /// <returns>The data that was sent.</returns>
+        async public Task<byte[]> SendBytes(UdpClient client, IPEndPoint recipient, byte[] data)
+        {
+            Console.WriteLine(recipient.Port);
+            await client.SendAsync(data, data.Length, recipient);
+
+            return data;
+        }
+
+        /// <summary>
+        /// Send a packet to a stream and return the written data.
         /// </summary>
         /// <param name="recipient">The recipient. Usually something like a TCP client.</param>
-        /// <param name="message">The message to send.</param>
+        /// <param name="packet">The packet to send.</param>
         /// <returns>The data that was sent.</returns>
-        public Task<byte[]> Send(Stream recipient, IMessage message)
-            => Send(recipient, PrepareMessage(message));
+        public Task<byte[]> SendPacket(Stream recipient, IPacket packet)
+            => SendBytes(recipient, PreparePacket(packet));
         
         /// <summary>
-        /// Write a message to a stream and return the written data.
+        /// Send a packet to an endpoint over a UDP client and return the written data.
+        /// </summary>
+        /// <param name="recipient">The recipient. Usually something like a TCP client.</param>
+        /// <param name="packet">The packet to send.</param>
+        /// <returns>The data that was sent.</returns>
+        public Task<byte[]> SendPacket(UdpClient client, IPEndPoint recipient, IPacket packet)
+            => SendBytes(client, recipient, PreparePacket(packet));
+        
+        /// <summary>
+        /// Send a packet to a stream and return the written data.
         /// The object will automatically be serialized to a message by the registered serializer.
         /// </summary>
         /// <param name="recipient">The recipient. Usually something like a TCP client.</param>
         /// <param name="object">The object to send.</param>
         /// <returns>The data that was sent.</returns>
-        async public Task<byte[]> Send(Stream recipient, object obj)
+        async public Task<byte[]> Send<T>(Stream recipient, T obj)
         {
-            IMessageType<object> type = typeConfig.GetTypeByObject(obj);
+            if (obj is byte[]) {
+                return await SendBytes(recipient, (byte[])(IEnumerable<byte>)obj);
+            }
+
+            if (obj is IPacket) {
+                return await SendPacket(recipient, (IPacket)obj);
+            }
+
+            IPacket packet = CreatePacketFromObject(obj);
+
+            if (packet == null) {
+                return new byte[0];
+            }
+
+            return await SendPacket(recipient, packet);
+        }
+
+        /// <summary>
+        /// Send a packet to an endpoint over a UDP client and return the written data.
+        /// The object will automatically be serialized to a message by the registered serializer.
+        /// </summary>
+        /// <param name="client">The UDP client.</param>
+        /// <param name="recipient">The recipient.</param>
+        /// <param name="obj">The object to send.</param>
+        /// <typeparam name="T">The object type.</typeparam>
+        /// <returns>The sent bytes.</returns>
+        async public Task<byte[]> Send<T>(UdpClient client, IPEndPoint recipient, T obj)
+        {
+            if (obj is byte[]) {
+                return await SendBytes(client, recipient, (byte[])(IEnumerable<byte>)obj);
+            }
+
+            if (obj is IPacket) {
+                return await SendPacket(client, recipient, (IPacket)obj);
+            }
+
+            IPacket packet = CreatePacketFromObject(obj);
+
+            if (packet == null) {
+                return null;
+            }
+
+            return await SendPacket(client, recipient, packet);
+        }
+
+        /// <summary>
+        /// Create a packet from an object.
+        /// </summary>
+        /// <param name="obj">The object to send.</param>
+        /// <typeparam name="T">The object type.</typeparam>
+        /// <returns>The created packet.</returns>
+        IPacket CreatePacketFromObject<T>(T obj)
+        {
+            IMessageType type = typeConfig.GetType<T>();
 
             if (type == null) {
-                return new byte[0];
+                return null;
             }
 
             byte[] data = type.Serializer.Serialize(obj);
 
             if (data == null) {
-                return new byte[0];
+                return null;
             }
 
-            Message message = new Message(type.TypeId, data);
+            int typeId = typeConfig.GetTypeId(type);
 
-            return await Send(recipient, message);
+            return new Packet(typeId, data);
         }
 
         /// <summary>
-        /// Transform a message to a byte array that contains
+        /// Transform a packet to a byte array that contains
         /// the message type and the data of the message.
         /// </summary>
-        /// <param name="message">The message to transform.</param>
-        /// <returns>The prepared message as a byte array.</returns>
-        byte[] PrepareMessage(IMessage message)
+        /// <param name="packet">The packet to transform.</param>
+        /// <returns>The prepared packet as a byte array.</returns>
+        byte[] PreparePacket(IPacket packet)
         {
             List<byte> data = new List<byte>();
 
-            data.AddRange(ToLittleEndian(BitConverter.GetBytes(message.TypeId)));
-            data.AddRange(ToLittleEndian(message.Data));
+            data.AddRange(ToLittleEndian(BitConverter.GetBytes(packet.MessageTypeId)));
+            data.AddRange(ToLittleEndian(packet.Data));
 
             return data.ToArray();
         }

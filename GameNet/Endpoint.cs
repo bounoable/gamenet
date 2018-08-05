@@ -1,3 +1,6 @@
+using System;
+using System.Net;
+using System.Threading;
 using GameNet.Messaging;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -7,18 +10,41 @@ namespace GameNet
 {
     abstract public class Endpoint
     {
+        public int UdpPort => _udpClient != null ? ((IPEndPoint)_udpClient.Client.LocalEndPoint).Port : -1;
+
+        public NetworkConfiguration NetworkConfig { get; }
+        
+        protected IEnumerable<IPEndPoint> UdpEndpoints => _udpEndpoints;
+
         abstract protected bool ShouldReceiveData { get; }
 
-        HashSet<IDataHandler> dataHandlers = new HashSet<IDataHandler>();
+        protected UdpClient _udpClient;
+        protected HashSet<IPEndPoint> _udpEndpoints = new HashSet<IPEndPoint>();
+
+        HashSet<IDataHandler> _dataHandlers = new HashSet<IDataHandler>();
+
+        /// <summary>
+        /// Initialize an endpoint.
+        /// </summary>
+        /// <param name="config">The configuration.</param>
+        public Endpoint(NetworkConfiguration config)
+        {
+            if (config == null) {
+                throw new ArgumentNullException("config");
+            }
+
+            NetworkConfig = config;
+            _udpClient = new UdpClient(NetworkConfig.LocalUdpPort);
+        }
 
         /// <summary>
         /// Register a data handler for the received data.
         /// </summary>
         /// <param name="handler">The data handler.</param>
-        public void RegisterDataHandler(IDataHandler handler) => dataHandlers.Add(handler);
+        public void RegisterDataHandler(IDataHandler handler) => _dataHandlers.Add(handler);
 
         /// <summary>
-        /// Let the client receive data from the server.
+        /// Let the endpoint receive data from a TCP client.
         /// </summary>
         protected async Task ReceiveData(TcpClient client)
         {
@@ -29,10 +55,44 @@ namespace GameNet
                     var data = new byte[client.ReceiveBufferSize];
 
                     await stream.ReadAsync(data, 0, client.ReceiveBufferSize);
-
+                    
                     HandleReceivedData(data);
                 }
             }
+        }
+
+        /// <summary>
+        /// Let the endpoint receive data from an endpoint over an UDP client.
+        /// </summary>
+        /// <param name="client">The UDP client.</param>
+        /// <param name="endpoint">The remote endpoint</param>
+        /// <returns></returns>
+        protected async Task ReceiveData(UdpClient client, IPEndPoint endpoint)
+        {
+            await Task.Run(() => {
+                Console.WriteLine("jiojgjeorjgorejgjeroigj");
+                while (ShouldReceiveData) {
+                    System.Console.WriteLine("opfowkef");
+
+                    byte[] data = client.Receive(ref endpoint);
+
+                    System.Console.WriteLine("opfowkef");
+
+                    if (data.Length == 0)
+                        continue;
+                    
+                    System.Console.WriteLine("opfowkef");
+
+                    HandleReceivedData(data);
+
+                    // foreach (IPEndPoint endpoint in _udpEndpoints) {
+                    //     if (!endpoint.Equals(result.RemoteEndPoint))
+                    //         continue;
+
+                    //     HandleReceivedData(result.Buffer);
+                    // }
+                }
+            });
         }
 
         /// <summary>
@@ -41,7 +101,7 @@ namespace GameNet
         /// <param name="data">The received data.</param>
         protected void HandleReceivedData(byte[] data)
         {
-            foreach (IDataHandler handler in dataHandlers) {
+            foreach (IDataHandler handler in _dataHandlers) {
                 handler.Handle(data);
             }
         }

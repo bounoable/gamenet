@@ -1,21 +1,21 @@
 namespace GameNet.Messaging
 {
-    public class Message: IMessage
+    public class Packet: IPacket
     {
         /// <summary>
         /// The message type id.
         /// </summary>
         /// <value></value>
-        public int TypeId { get; }
+        public int MessageTypeId { get; }
 
         /// <summary>
         /// The message data.
         /// </summary>
         public byte[] Data { get; }
 
-        public Message(int typeId, byte[] data)
+        public Packet(int messageTypeId, byte[] data)
         {
-            TypeId = typeId;
+            MessageTypeId = messageTypeId;
             Data = data;
         }
     }

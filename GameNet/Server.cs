@@ -3,6 +3,7 @@ using System.Net;
 using System.Linq;
 using GameNet.Debug;
 using System.Threading;
+using GameNet.Messages;
 using GameNet.Messaging;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -12,8 +13,9 @@ namespace GameNet
 {
     public class Server: Endpoint
     {
-        public IPAddress IPAddress { get; }
-        public int Port { get; }
+        public ServerConfiguration Config { get; }
+        public IPAddress IPAddress => Config.IPAddress;
+        public int Port => Config.Port;
         public bool Active { get; private set; }
 
         /// <summary>
@@ -21,34 +23,30 @@ namespace GameNet
         /// </summary>
         override protected bool ShouldReceiveData => Active;
 
-        public IEnumerable<TcpClient> TcpClients => tcpClients.ToArray();
+        public IEnumerable<TcpClient> TcpClients => _clients.Values.Select(container => container.TcpClient);
 
         public event EventHandler<ClientConnectedEventArgs> ClientConnected;
 
-        protected Messenger messenger;
-        IServerDebugger debugger;
-        TcpListener socket;
+        TcpListener _socket;
+        protected Messenger _messenger;
 
-        protected HashSet<TcpClient> tcpClients = new HashSet<TcpClient>();
+        protected Dictionary<int, ClientContainer> _clients = new Dictionary<int, ClientContainer>();
+        int nextClientId = 0;
 
         bool AcceptsClients => Active;
 
         /// <summary>
         /// Initialize a server.
         /// </summary>
-        /// <param name="ipAddress">The IP address the server runs on.</param>
-        /// <param name="port">The port the server listens on.</param>
+        /// <param name="config">The configuration.</param>
         /// <param name="messenger">The messenger.</param>
-        /// <param name="debugger">The server debugger.</param>
-        public Server(IPAddress ipAddress, int port, Messenger messenger, IServerDebugger debugger = null)
+        public Server(ServerConfiguration config, Messenger messenger): base(config)
         {
-            ValidateIPAddress(ipAddress);
-            ValidatePort(port);
+            ValidateIPAddress(config.IPAddress);
+            ValidatePort(config.Port);
 
-            IPAddress = ipAddress;
-            Port = port;
-            this.messenger = messenger;
-            this.debugger = debugger;
+            Config = config;
+            _messenger = messenger;
         }
 
         /// <summary>
@@ -57,8 +55,11 @@ namespace GameNet
         /// <param name="ipAddress">The IP address the server runs on.</param>
         /// <param name="port">The port the server listens on.</param>
         /// <param name="messenger">The messenger.</param>
-        /// <param name="debugger">The server debugger.</param>
-        public Server(string ipAddress, int port, Messenger messenger, IServerDebugger debugger = null): this(IPAddress.Parse(ipAddress), port, messenger, debugger)
+        public Server(string ipAddress, ushort port, Messenger messenger): this(new ServerConfiguration()
+        {
+            IPAddress = IPAddress.Parse(ipAddress),
+            Port = port
+        }, messenger)
         {}
 
         /// <summary>
@@ -84,71 +85,15 @@ namespace GameNet
         }
 
         /// <summary>
-        /// Trigger a debug event.
-        /// </summary>
-        /// <param name="ev">The event type.</param>
-        /// <param name="data">The event data.</param>
-        void Debug(ServerEvent ev, EventData data = null)
-        {
-            if (debugger != null) {
-                debugger.Handle(ev, data);
-            }
-        }
-
-        /// <summary>
-        /// Trigger a debug event.
-        /// </summary>
-        /// <param name="ev">The event type.</param>
-        /// <param name="data">The event data.</param>
-        void Debug(ServerEvent ev, object data) => Debug(ev, new EventData(data));
-
-        /// <summary>
-        /// Trigger multiple debug events.
-        /// </summary>
-        /// <param name="ev">The event types.</param>
-        /// <param name="data">The event data.</param>
-        void Debug(ServerEvent[] ev, EventData data = null)
-        {
-            if (debugger != null) {
-                foreach (ServerEvent evnt in ev) {
-                    Debug(evnt, data);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Trigger multiple debug events.
-        /// </summary>
-        /// <param name="ev">The event types.</param>
-        /// <param name="data">The event data.</param>
-        void Debug(ServerEvent[] ev, object data) => Debug(ev, new EventData(data));
-
-        /// <summary>
         /// Start the server.
         /// </summary>
         public void Start()
         {
-            socket = new TcpListener(IPAddress, Port);
+            _socket = new TcpListener(IPAddress, Port);
 
-            try {
-                socket.Start();
-            } catch (SocketException e) {
-                if (debugger == null) {
-                    throw e;
-                }
-
-                Debug(ServerEvent.ServerStartFailed, new {
-                    Exception = e
-                });
-
-                return;
-            }
+            _socket.Start();
 
             Active = true;
-
-            Debug(ServerEvent.ServerStarted, new {
-                Server = this
-            });
 
             Task.Run(() => AcceptClients());
         }
@@ -162,19 +107,7 @@ namespace GameNet
 
             RemoveClients();
 
-            try {
-                socket.Stop();
-            } catch (SocketException e) {
-                Debug(ServerEvent.ServerStopFailed, new {
-                    Exception = e
-                });
-
-                return;
-            }
-
-            Debug(ServerEvent.ServerStopped, new {
-                Server = this
-            });
+            _socket.Stop();
         }
 
         /// <summary>
@@ -184,21 +117,16 @@ namespace GameNet
         {
             while (AcceptsClients) {
                 try {
-                    TcpClient client = await socket.AcceptTcpClientAsync();
+                    TcpClient client = await _socket.AcceptTcpClientAsync();
+                    ClientContainer container = new ClientContainer(client);
 
-                    tcpClients.Add(client);
+                    _clients[nextClientId] = container;
+                    nextClientId++;
 
-                    Task.Run(() => ReceiveDataFromClient(client));
+                    Task.Run(() => ReceiveData(client));
+                    Task.Run(() => SendUdpPortTo(container));
 
                     ClientConnected(this, new ClientConnectedEventArgs(client));
-
-                    Debug(new[] {
-                        ServerEvent.ClientConnected,
-                        ServerEvent.TcpClientConnected
-                    }, new {
-                        Client = client,
-                        ConntectedAt = DateTime.Now
-                    });
                 } catch (ObjectDisposedException e) {}
             }
         }
@@ -207,17 +135,25 @@ namespace GameNet
         /// Determine if a TCP client is handled by the server.
         /// </summary>
         /// <param name="client">The TCP client.</param>
-        public bool ContainsClient(TcpClient client) => tcpClients.Contains(client);
+        public bool ContainsClient(TcpClient client) => TcpClients.Contains(client);
 
         /// <summary>
         /// Remove a TCP client from the server.
         /// </summary>
         /// <param name="client">The TCP client.</param>
-        public void RemoveClient(TcpClient client)
+        public void RemoveClient(ClientContainer client)
         {
-            client.GetStream().Close();
-            client.Close();
-            tcpClients.Remove(client);
+            _udpEndpoints.Remove(client.UdpEndpoint);
+            client.TcpClient.GetStream().Close();
+            client.TcpClient.Close();
+
+            foreach (KeyValuePair<int, ClientContainer> entry in _clients) {
+                if (entry.Value != client)
+                    continue;
+                
+                _clients.Remove(entry.Key);
+                return;
+            }
         }
 
         /// <summary>
@@ -225,39 +161,94 @@ namespace GameNet
         /// </summary>
         public void RemoveClients()
         {
-            var tcpClients = new TcpClient[this.tcpClients.Count];
-
-            this.tcpClients.CopyTo(tcpClients);
-
-            foreach (TcpClient client in tcpClients) {
-                RemoveClient(client);
+            for (int i = 0; i < _clients.Count; i++) {
+                RemoveClient(_clients[i]);
             }
         }
 
         /// <summary>
-        /// Start receiving data from a client.
+        /// Send a UDP port message containing the server's local UDP port to a client.
         /// </summary>
-        /// <param name="client">The TCP client.</param>
-        Task ReceiveDataFromClient(TcpClient client) => ReceiveData(client);
+        /// <param name="client">The client container.</param>
+        /// <returns>The sent bytes.</returns>
+        async Task<byte[]> SendUdpPortTo(ClientContainer client)
+            => await SendTo<UdpPortMessage>(client, new ServerUdpPortMessage(this, client.SecretToken));
+
+        /// <summary>
+        /// Register a client's local UDP port.
+        /// </summary>
+        /// <param name="message">The UDP port message.</param>
+        public void RegisterClientUdpPort(UdpPortMessage message)
+        {
+            foreach (ClientContainer client in _clients.Values) {
+                if (client.SecretToken != message.Secret)
+                    continue;
+                
+                client.UdpEndpoint = (IPEndPoint)client.TcpClient.Client.RemoteEndPoint;
+                client.UdpEndpoint.Port = message.Port;
+
+                Task.Run(() => ReceiveData(_udpClient, client.UdpEndpoint));
+
+                return;
+            }
+        }
 
         /// <summary>
         /// Send data to the clients.
         /// </summary>
         /// <param name="data">The data to send.</param>
-        async public Task Send(byte[] data)
+        /// <param name="protocol">The protocol to use.</param>
+        async public Task Send(byte[] data, ProtocolType protocol = ProtocolType.Tcp)
         {
-            await Task.WhenAll(tcpClients.Select(
-                client => messenger.Send(client.GetStream(), data)
-            ));
+            switch (protocol) {
+                case ProtocolType.Udp:
+                    await Task.WhenAll(UdpEndpoints.Select(
+                        endpoint => _messenger.SendBytes(_udpClient, endpoint, data)
+                    )); break;
+
+                case ProtocolType.Tcp:
+                default:
+                    await Task.WhenAll(TcpClients.Select(
+                        client => _messenger.SendBytes(client.GetStream(), data)
+                    )); break;
+            }
         }
 
         /// <summary>
         /// Send data to a specific client and return the sent bytes.
         /// </summary>
+        /// <param name="client">The recipient client container.</param>
+        /// <param name="data">The data to send.</param>
+        /// <returns>The sent bytes.</returns>
+        async public Task<byte[]> SendTo(ClientContainer client, byte[] data, ProtocolType protocol = ProtocolType.Tcp)
+        {
+            switch (protocol) {
+                case ProtocolType.Udp:
+                    return await SendTo(client.UdpEndpoint, data);
+
+                case ProtocolType.Tcp:
+                default:
+                    return await SendTo(client.TcpClient, data);
+            }
+        }
+
+        /// <summary>
+        /// Send data to a specific client and return the sent bytes.
+        /// </summary>
+        /// <param name="client">The recipient.</param>
         /// <param name="data">The data to send.</param>
         /// <returns>The sent bytes.</returns>
         async public Task<byte[]> SendTo(TcpClient client, byte[] data)
-            => await messenger.Send(client.GetStream(), data);
+            => await _messenger.Send(client.GetStream(), data);
+        
+        /// <summary>
+        /// Send data to a specific endpoint over the UDP client and return the sent bytes.
+        /// </summary>
+        /// <param name="recipient">The recipient.</param>
+        /// <param name="data">The data to send.</param>
+        /// <returns>The sent bytes.</returns>
+        async public Task<byte[]> SendTo(IPEndPoint recipient, byte[] data)
+            => await _messenger.Send(_udpClient, recipient, data);
         
         /// <summary>
         /// Send data to specific clients.
@@ -267,7 +258,232 @@ namespace GameNet
         async public Task SendTo(IEnumerable<TcpClient> clients, byte[] data)
         {
             await Task.WhenAll(clients.Select(
-                client => messenger.Send(client.GetStream(), data)
+                client => _messenger.Send(client.GetStream(), data)
+            ));
+        }
+
+        /// <summary>
+        /// Send data to specific recipients over the UDP client.
+        /// </summary>
+        /// <param name="recipients">The recipients.</param>
+        /// <param name="data">The data to send.</param>
+        async public Task SendTo(IEnumerable<IPEndPoint> recipients, byte[] data)
+        {
+            await Task.WhenAll(recipients.Select(
+                endpoint => _messenger.Send(_udpClient, endpoint, data)
+            ));
+        }
+
+        /// <summary>
+        /// Send a packet to the clients.
+        /// </summary>
+        /// <param name="packet">The packet to send.</param>
+        /// <param name="protocol">The protocol to use.</param>
+        async public Task Send(IPacket packet, ProtocolType protocol = ProtocolType.Tcp)
+        {
+            switch (protocol) {
+                case ProtocolType.Udp:
+                    await Task.WhenAll(_udpEndpoints.Select(
+                        endpoint => _messenger.SendPacket(_udpClient, endpoint, packet)
+                    )); break;
+
+                case ProtocolType.Tcp:
+                default:
+                    await Task.WhenAll(TcpClients.Select(
+                        client => _messenger.SendPacket(client.GetStream(), packet)
+                    )); break;
+            }
+        }
+
+        /// <summary>
+        /// Send a packet to a specific client and return the sent bytes.
+        /// </summary>
+        /// <param name="client">The recipient client container.</param>
+        /// <param name="packet">The packet to send.</param>
+        /// <param name="protocol">The protocol to use.</param>
+        /// <returns>The sent bytes.</returns>
+        async public Task<byte[]> SendTo(ClientContainer client, IPacket packet, ProtocolType protocol = ProtocolType.Tcp)
+        {
+            switch (protocol) {
+                case ProtocolType.Udp:
+                    return await SendTo(client.UdpEndpoint, packet);
+
+                case ProtocolType.Tcp:
+                default:
+                    return await SendTo(client.TcpClient, packet);
+            }
+        }
+
+        /// <summary>
+        /// Send a packet to a specific client and return the sent bytes.
+        /// </summary>
+        /// <param name="client">The recipient.</param>
+        /// <param name="packet">The packet to send.</param>
+        /// <returns>The sent bytes.</returns>
+        async public Task<byte[]> SendTo(TcpClient client, IPacket message)
+            => await _messenger.SendPacket(client.GetStream(), message);
+        
+        /// <summary>
+        /// Send a packet to specific endpoints over the UDP client.
+        /// </summary>
+        /// <param name="clients">The recipient client containers.</param>
+        /// <param name="packet">The packet to send.</param>
+        /// <param name="protocol">The protocol to use.</param>
+        /// <returns>The sent bytes.</returns>
+        async public Task SendTo(IEnumerable<ClientContainer> clients, IPacket packet, ProtocolType protocol = ProtocolType.Tcp)
+        {
+            switch (protocol) {
+                case ProtocolType.Udp:
+                    await Task.WhenAll(clients.Select(
+                        container => SendTo(container.UdpEndpoint, packet)
+                    )); break;
+
+                case ProtocolType.Tcp:
+                default:
+                    await Task.WhenAll(clients.Select(
+                        container => SendTo(container.TcpClient, packet)
+                    )); break;
+            }
+        }
+        
+        /// <summary>
+        /// Send a packet to specific clients.
+        /// </summary>
+        /// <param name="clients">The recipients.</param>
+        /// <param name="packet">The packet to send.</param>
+        /// <returns>The sent bytes.</returns>
+        async public Task SendTo(IEnumerable<TcpClient> clients, IPacket packet)
+        {
+            await Task.WhenAll(clients.Select(
+                client => SendTo(client, packet)
+            ));
+        }
+
+        /// <summary>
+        /// Send a packet to specific endpoints over the UDP client.
+        /// </summary>
+        /// <param name="clients">The recipients.</param>
+        /// <param name="packet">The packet to send.</param>
+        /// <returns>The sent bytes.</returns>
+        async public Task SendTo(IEnumerable<IPEndPoint> clients, IPacket packet)
+        {
+            await Task.WhenAll(clients.Select(
+                endpoint => SendTo(endpoint, packet)
+            ));
+        }
+
+        /// <summary>
+        /// Send an object to all clients.
+        /// The object will automatically be serialized to a message by the registered serializer.
+        /// </summary>
+        /// <param name="object">The object to send.</param>
+        /// <param name="protocol">The protocol to use.</param>
+        /// <returns>The sent bytes.</returns>
+        async public Task Send<T>(T obj, ProtocolType protocol = ProtocolType.Tcp)
+        {
+            switch (protocol) {
+                case ProtocolType.Udp:
+                    await Task.WhenAll(UdpEndpoints.Select(
+                        endpoint => _messenger.Send(_udpClient, endpoint, obj)
+                    )); break;
+
+                case ProtocolType.Tcp:
+                default:
+                    await Task.WhenAll(TcpClients.Select(
+                        client => _messenger.Send(client.GetStream(), obj)
+                    )); break;
+            }
+        }
+
+        /// <summary>
+        /// Send an object to a specific client and return the sent bytes.
+        /// The object will automatically be serialized to a message by the registered serializer.
+        /// </summary>
+        /// <param name="client">The recipient client container.</param>
+        /// <param name="object">The object to send.</param>
+        /// <param name="protocol">The protocol to use.</param>
+        /// <returns>The sent bytes.</returns>
+        async public Task<byte[]> SendTo<T>(ClientContainer client, T obj, ProtocolType protocol = ProtocolType.Tcp)
+        {
+            switch (protocol) {
+                case ProtocolType.Udp:
+                    return await SendTo(client.UdpEndpoint, obj);
+
+                case ProtocolType.Tcp:
+                default:
+                    return await SendTo(client.TcpClient, obj);
+            }
+        }
+
+        /// <summary>
+        /// Send an object to a specific client and return the sent bytes.
+        /// The object will automatically be serialized to a message by the registered serializer.
+        /// </summary>
+        /// <param name="client">The recipient.</param>
+        /// <param name="object">The object to send.</param>
+        /// <returns>The sent bytes.</returns>
+        async public Task<byte[]> SendTo<T>(TcpClient client, T obj)
+            => await _messenger.Send<T>(client.GetStream(), obj);
+        
+        /// <summary>
+        /// Send an object to a specific endpoint over the UDP client and return the sent bytes.
+        /// The object will automatically be serialized to a message by the registered serializer.
+        /// </summary>
+        /// <param name="recipient">The recipient.</param>
+        /// <param name="object">The object to send.</param>
+        /// <returns>The sent bytes.</returns>
+        async public Task<byte[]> SendTo<T>(IPEndPoint recipient, T obj)
+            => await _messenger.Send<T>(_udpClient, recipient, obj);
+        
+        /// <summary>
+        /// Send an object to specific clients.
+        /// The object will automatically be serialized to a message by the registered serializer.
+        /// </summary>
+        /// <param name="clients">The recipient client containers.</param>
+        /// <param name="object">The object to send.</param>
+        /// <param name="protocol">The protocol to use.</param>
+        /// <returns>The sent bytes.</returns>
+        async public Task SendTo<T>(IEnumerable<ClientContainer> clients, T obj, ProtocolType protocol = ProtocolType.Tcp)
+        {
+            switch (protocol) {
+                case ProtocolType.Udp:
+                    await Task.WhenAll(clients.Select(
+                        container => SendTo<T>(container.UdpEndpoint, obj)
+                    )); break;
+
+                case ProtocolType.Tcp:
+                default:
+                    await Task.WhenAll(clients.Select(
+                        container => SendTo<T>(container.TcpClient, obj)
+                    )); break;
+            }
+        }
+        
+        /// <summary>
+        /// Send an object to specific clients.
+        /// The object will automatically be serialized to a message by the registered serializer.
+        /// </summary>
+        /// <param name="clients">The recipients.</param>
+        /// <param name="object">The object to send.</param>
+        /// <returns>The sent bytes.</returns>
+        async public Task SendTo<T>(IEnumerable<TcpClient> clients, T obj)
+        {
+            await Task.WhenAll(clients.Select(
+                client => _messenger.Send<T>(client.GetStream(), obj)
+            ));
+        }
+
+        /// <summary>
+        /// Send an object to specific endpoints over the UDP client.
+        /// The object will automatically be serialized to a message by the registered serializer.
+        /// </summary>
+        /// <param name="clients">The recipients.</param>
+        /// <param name="object">The object to send.</param>
+        /// <returns>The sent bytes.</returns>
+        async public Task SendTo<T>(IEnumerable<IPEndPoint> clients, T obj)
+        {
+            await Task.WhenAll(clients.Select(
+                endpoint => _messenger.Send<T>(_udpClient, endpoint, obj)
             ));
         }
     }

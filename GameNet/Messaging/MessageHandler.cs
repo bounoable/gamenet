@@ -4,7 +4,7 @@ using System.Text;
 
 namespace GameNet.Messaging
 {
-    abstract public class MessageHandler<T>: IMessageHandler<T>
+    abstract public class MessageHandler<T>: IMessageHandler
     {
         RecipientType handledRecipients;
 
@@ -12,7 +12,7 @@ namespace GameNet.Messaging
         /// Initialize the message handler.
         /// </summary>
         /// <param name="handledRecipients">The recipient types that should be handled.</param>
-        public MessageHandler(RecipientType handledRecipients)
+        public MessageHandler(RecipientType handledRecipients = RecipientType.Client | RecipientType.Server)
         {
             this.handledRecipients = handledRecipients;
         }
@@ -22,8 +22,12 @@ namespace GameNet.Messaging
         /// </summary>
         /// <param name="message">The received message.</param>
         /// <param name="recipient">The recipient type.</param>
-        public void Handle(T message, RecipientType recipient)
+        public void Handle(object message, RecipientType recipient)
         {
+            if (!(message is T)) {
+                return;
+            }
+
             if (!HandlesRecipient(recipient)) {
                 return;
             }
@@ -32,7 +36,7 @@ namespace GameNet.Messaging
                 return;
             }
 
-            HandleMessage(message);
+            HandleMessage((T)message);
         }
 
         /// <summary>
