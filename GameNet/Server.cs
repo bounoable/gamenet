@@ -2,6 +2,7 @@ using System;
 using System.Net;
 using System.Linq;
 using GameNet.Debug;
+using GameNet.Events;
 using System.Threading;
 using GameNet.Messages;
 using GameNet.Messaging;
@@ -18,14 +19,20 @@ namespace GameNet
         public int Port => Config.Port;
         public bool Active { get; private set; }
 
-        /// <summary>
-        /// Indicates if the server should receive data from the clients.
-        /// </summary>
         override protected bool ShouldReceiveData => Active;
 
-        public IEnumerable<TcpClient> TcpClients => _clients.Values.Select(container => container.TcpClient);
+        public IEnumerable<TcpClient> TcpClients => _clients.Values
+            .Select(container => container.TcpClient);
 
-        public event EventHandler<ClientConnectedEventArgs> ClientConnected;
+        public IEnumerable<IPEndPoint> UdpEndpoints => _clients.Values
+            .Select(container => container.UdpEndpoint)
+            .Where(endpoint => endpoint != null);
+
+        #region events
+        public event EventHandler<ClientConnectedEventArgs> ClientConnected = delegate {};
+        public event EventHandler<ClientDisconnectedEventArgs> ClientDisconnected = delegate {};
+        public event EventHandler<UdpPortsExchangedEventArgs> UdpPortsExchanged = delegate {};
+        #endregion
 
         TcpListener _socket;
         protected Messenger _messenger;
@@ -126,7 +133,10 @@ namespace GameNet
                     Task.Run(() => ReceiveData(client));
                     Task.Run(() => SendUdpPortTo(container));
 
-                    ClientConnected(this, new ClientConnectedEventArgs(client));
+                    // TODO: Regelmäßiger Check ob TCP connection noch besteht.
+                    // Events implementieren
+
+                    ClientConnected(this, new ClientConnectedEventArgs(container));
                 } catch (ObjectDisposedException e) {}
             }
         }
@@ -136,25 +146,6 @@ namespace GameNet
         /// </summary>
         /// <param name="client">The TCP client.</param>
         public bool ContainsClient(TcpClient client) => TcpClients.Contains(client);
-
-        /// <summary>
-        /// Remove a TCP client from the server.
-        /// </summary>
-        /// <param name="client">The TCP client.</param>
-        public void RemoveClient(ClientContainer client)
-        {
-            _udpEndpoints.Remove(client.UdpEndpoint);
-            client.TcpClient.GetStream().Close();
-            client.TcpClient.Close();
-
-            foreach (KeyValuePair<int, ClientContainer> entry in _clients) {
-                if (entry.Value != client)
-                    continue;
-                
-                _clients.Remove(entry.Key);
-                return;
-            }
-        }
 
         /// <summary>
         /// Remove the clients from the server.
@@ -167,12 +158,42 @@ namespace GameNet
         }
 
         /// <summary>
+        /// Remove a TCP client from the server.
+        /// </summary>
+        /// <param name="client">The TCP client.</param>
+        public void RemoveClient(ClientContainer client)
+        {
+            try {
+                client.TcpClient.GetStream().Close();
+                client.TcpClient.Close();
+            } catch (Exception e) {
+                return;
+            }
+
+            int id = -1;
+
+            foreach (KeyValuePair<int, ClientContainer> entry in _clients) {
+                if (entry.Value != client)
+                    continue;
+
+                id = entry.Key;
+                break;
+            }
+
+            if (id > -1) {
+                _clients.Remove(id);
+            }
+
+            ClientDisconnected(this, new ClientDisconnectedEventArgs(client));
+        }
+
+        /// <summary>
         /// Send a UDP port message containing the server's local UDP port to a client.
         /// </summary>
         /// <param name="client">The client container.</param>
         /// <returns>The sent bytes.</returns>
         async Task<byte[]> SendUdpPortTo(ClientContainer client)
-            => await SendTo<UdpPortMessage>(client, new ServerUdpPortMessage(this, client.SecretToken));
+            => await SendTo<ServerUdpPortMessage>(client, new ServerUdpPortMessage(client.SecretToken, NetworkConfig.LocalUdpPort));
 
         /// <summary>
         /// Register a client's local UDP port.
@@ -188,6 +209,8 @@ namespace GameNet
                 client.UdpEndpoint.Port = message.Port;
 
                 Task.Run(() => ReceiveData(_udpClient, client.UdpEndpoint));
+
+                UdpPortsExchanged(this, new UdpPortsExchangedEventArgs(client));
 
                 return;
             }
@@ -283,7 +306,7 @@ namespace GameNet
         {
             switch (protocol) {
                 case ProtocolType.Udp:
-                    await Task.WhenAll(_udpEndpoints.Select(
+                    await Task.WhenAll(UdpEndpoints.Select(
                         endpoint => _messenger.SendPacket(_udpClient, endpoint, packet)
                     )); break;
 

@@ -15,20 +15,23 @@ namespace GameNet.Messaging
     {
         int nextTypeId = 0;
 
-        Dictionary<Type, IMessageType> messageTypes = new Dictionary<Type, IMessageType>();
-        Dictionary<Type, int> objectTypeIds = new Dictionary<Type, int>();
+        readonly Dictionary<Type, IMessageType> messageTypes = new Dictionary<Type, IMessageType>();
+        readonly Dictionary<Type, int> objectTypeIds = new Dictionary<Type, int>();
 
         /// <summary>
         /// Register a message type.
         /// </summary>
+        /// <param name="id">The message type id.</param>
+        /// <param name="objectType">The object type of the messages.</param>
         /// <param name="type">The message type.</param>
         /// <param name="conflict">The type id conflict option.</param>
-        public void RegisterMessageType<T>(int id, IMessageType type, TypeIdConflict conflict = TypeIdConflict.Override)
+        public void RegisterMessageType(int id, Type objectType, IMessageType type, TypeIdConflict conflict = TypeIdConflict.Override)
         {
             if (objectTypeIds.ContainsValue(id)) {
                 if (conflict == TypeIdConflict.Override) {
-                    messageTypes[typeof(T)] = type;
-                    objectTypeIds[typeof(T)] = id;
+                    messageTypes[objectType] = type;
+                    objectTypeIds[objectType] = id;
+                    UpdateNextTypeId();
                     return;
                 }
 
@@ -41,14 +44,34 @@ namespace GameNet.Messaging
                 }
             }
 
-            messageTypes[typeof(T)] = type;
-            objectTypeIds[typeof(T)] = id;
+            messageTypes[objectType] = type;
+            objectTypeIds[objectType] = id;
+            UpdateNextTypeId();
         }
 
         /// <summary>
         /// Register a message type.
         /// </summary>
+        /// <param name="id">The message type id.</param>
         /// <param name="type">The message type.</param>
+        /// <param name="conflict">The type id conflict option.</param>
+        /// <typeparam name="T">The object type of the messages.</typeparam>
+        public void RegisterMessageType<T>(int id, IMessageType type, TypeIdConflict conflict = TypeIdConflict.Override)
+            => RegisterMessageType(id, typeof(T), type, conflict);
+        
+        /// <summary>
+        /// Register a message type.
+        /// </summary>
+        /// <param name="objectType">The object type of the messages.</param>
+        /// <param name="type">The message type.</param>
+        public void RegisterMessageType(Type objectType, IMessageType type)
+            => RegisterMessageType(GetNextTypeId(), objectType, type);
+
+        /// <summary>
+        /// Register a message type.
+        /// </summary>
+        /// <param name="type">The message type.</param>
+        /// <typeparam name="T">The object type of the messages.</typeparam>
         public void RegisterMessageType<T>(IMessageType type)
             => RegisterMessageType<T>(GetNextTypeId(), type);
 
@@ -74,9 +97,24 @@ namespace GameNet.Messaging
         int GetNextTypeId()
         {
             int id = nextTypeId;
-            nextTypeId++;
+
+            UpdateNextTypeId();
 
             return id;
+        }
+
+        /// <summary>
+        /// Increment the next type id.
+        /// </summary>
+        void UpdateNextTypeId()
+        {
+            if (objectTypeIds.Count == 0) {
+                return;
+            }
+
+            int[] typeIds = objectTypeIds.Values.OrderByDescending(id => id).ToArray();
+            
+            nextTypeId = typeIds[0] + 1;
         }
 
         /// <summary>

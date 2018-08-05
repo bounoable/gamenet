@@ -126,7 +126,7 @@ namespace GameNet
         /// <param name="secret">The UDP port message secret.</param>
         /// <returns>The sent bytes.</returns>
         async Task<byte[]> SendUdpPortToServer(string secret)
-            => await Send<UdpPortMessage>(new ClientUdpPortMessage(this, secret));
+            => await Send<ClientUdpPortMessage>(new ClientUdpPortMessage(secret, NetworkConfig.LocalUdpPort));
         
         /// <summary>
         /// Send data to the server and return the sent data.

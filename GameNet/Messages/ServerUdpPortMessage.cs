@@ -1,10 +1,23 @@
+using GameNet.Messaging;
 using GameNet.Messages.Handlers;
+using GameNet.Messages.Serializers;
 
 namespace GameNet.Messages
 {
     public class ServerUdpPortMessage: UdpPortMessage
     {
-        public ServerUdpPortMessage(Server server, string secret): base(new UdpPortMessageHandler(server), secret, server.NetworkConfig.LocalUdpPort)
+        public const int TypeId = 1;
+        
+        public ServerUdpPortMessage(): base(new ServerUdpPortMessageSerializer())
         {}
+
+        public ServerUdpPortMessage(Client client): base(new ServerUdpPortMessageSerializer(), new UdpPortMessageHandler(client))
+        {}
+
+        public ServerUdpPortMessage(string secret, ushort port): base(secret, port)
+        {}
+
+        public static ServerUdpPortMessage TypeForClient(Client client) => new ServerUdpPortMessage(client);
+        public static ServerUdpPortMessage TypeForServer() => new ServerUdpPortMessage();
     }
 }

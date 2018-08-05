@@ -41,7 +41,6 @@ namespace GameNet.Messaging
         /// <returns>The data that was sent.</returns>
         async public Task<byte[]> SendBytes(UdpClient client, IPEndPoint recipient, byte[] data)
         {
-            Console.WriteLine(recipient.Port);
             await client.SendAsync(data, data.Length, recipient);
 
             return data;
@@ -74,7 +73,7 @@ namespace GameNet.Messaging
         /// <returns>The data that was sent.</returns>
         async public Task<byte[]> Send<T>(Stream recipient, T obj)
         {
-            if (obj is byte[]) {
+            if (obj is IEnumerable<byte>) {
                 return await SendBytes(recipient, (byte[])(IEnumerable<byte>)obj);
             }
 
@@ -102,7 +101,7 @@ namespace GameNet.Messaging
         /// <returns>The sent bytes.</returns>
         async public Task<byte[]> Send<T>(UdpClient client, IPEndPoint recipient, T obj)
         {
-            if (obj is byte[]) {
+            if (obj is IEnumerable<byte>) {
                 return await SendBytes(client, recipient, (byte[])(IEnumerable<byte>)obj);
             }
 

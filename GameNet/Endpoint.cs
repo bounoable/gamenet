@@ -14,12 +14,9 @@ namespace GameNet
 
         public NetworkConfiguration NetworkConfig { get; }
         
-        protected IEnumerable<IPEndPoint> UdpEndpoints => _udpEndpoints;
-
         abstract protected bool ShouldReceiveData { get; }
 
         protected UdpClient _udpClient;
-        protected HashSet<IPEndPoint> _udpEndpoints = new HashSet<IPEndPoint>();
 
         HashSet<IDataHandler> _dataHandlers = new HashSet<IDataHandler>();
 
@@ -70,27 +67,13 @@ namespace GameNet
         protected async Task ReceiveData(UdpClient client, IPEndPoint endpoint)
         {
             await Task.Run(() => {
-                Console.WriteLine("jiojgjeorjgorejgjeroigj");
                 while (ShouldReceiveData) {
-                    System.Console.WriteLine("opfowkef");
-
                     byte[] data = client.Receive(ref endpoint);
-
-                    System.Console.WriteLine("opfowkef");
 
                     if (data.Length == 0)
                         continue;
-                    
-                    System.Console.WriteLine("opfowkef");
 
                     HandleReceivedData(data);
-
-                    // foreach (IPEndPoint endpoint in _udpEndpoints) {
-                    //     if (!endpoint.Equals(result.RemoteEndPoint))
-                    //         continue;
-
-                    //     HandleReceivedData(result.Buffer);
-                    // }
                 }
             });
         }

@@ -19,10 +19,6 @@ namespace GameNet.Messages.Handlers
 
         override protected void HandleMessage(UdpPortMessage message)
         {
-            // TODO: UdpPortMessage in ServerUdpPortMessage und ClientUdpPortMessage aufteilen und Port durch Interface IUdpPortMessage bereitstellen.
-
-            System.Console.WriteLine("waaas");
-
             if (client != null) {
                 client.RegisterServerUdpPort(message);
             } else if (server != null) {

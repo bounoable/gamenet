@@ -449,7 +449,7 @@ namespace GameNet.Messaging
         public static string PullString(ref byte[] data)
         {
             string result = GetString(data);
-            data = data.Skip(result.Length * sizeof(char)).ToArray();
+            data = data.Skip(result.Length * sizeof(char) + sizeof(int)).ToArray();
 
             return result;
         }

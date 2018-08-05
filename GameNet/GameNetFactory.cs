@@ -9,12 +9,15 @@ namespace GameNet
 {
     public class GameNetFactory
     {
-        public MessageTypeConfig MessageTypeConfig { get; } = new MessageTypeConfig();
+        readonly Dictionary<Type, IMessageType> _messageTypes = new Dictionary<Type, IMessageType>();
 
-        public GameNetFactory()
-        {
-            MessageTypeConfig.RegisterMessageType<UdpPortMessage>(new UdpPortMessage());
-        }
+        /// <summary>
+        /// Register a message type for both the server and the client.
+        /// </summary>
+        /// <param name="messageType">The message type.</param>
+        /// <typeparam name="T">The object type of the message.</typeparam>
+        public void RegisterMessageType<T>(IMessageType messageType)
+            => _messageTypes[typeof(T)] = messageType;
 
         /// <summary>
         /// Create a game client.
@@ -23,13 +26,14 @@ namespace GameNet
         /// <returns>The game client.</returns>
         public Client CreateClient(ushort udpPort = NetworkConfiguration.DEFAULT_UDP_PORT)
         {
-            Messenger messenger = new Messenger(MessageTypeConfig);
-            Client client = new Client(new NetworkConfiguration()
-            {
-                LocalUdpPort = udpPort
-            }, messenger);
+            var types = new MessageTypeConfig();
+            var messenger = new Messenger(types);
+            var client = new Client(new NetworkConfiguration(udpPort), messenger);
 
-            MessageParser messageParser = new MessageParser(MessageTypeConfig, RecipientType.Client);
+            RegisterDefaultClientMessageTypes(client, types);
+            RegisterUserMessageTypes(types);
+
+            var messageParser = new MessageParser(types, RecipientType.Client);
 
             client.RegisterDataHandler(messageParser);
 
@@ -45,15 +49,14 @@ namespace GameNet
         /// <returns>The game server.</returns>
         public Server CreateServer(IPAddress ipAddress, ushort tcpPort = ServerConfiguration.DEFAULT_PORT, ushort udpPort = NetworkConfiguration.DEFAULT_UDP_PORT)
         {
-            Messenger messenger = new Messenger(MessageTypeConfig);
-            Server server = new Server(new ServerConfiguration()
-            {
-                LocalUdpPort = udpPort,
-                IPAddress = ipAddress,
-                Port = tcpPort,
-            }, messenger);
+            var types = new MessageTypeConfig();
+            var messenger = new Messenger(types);
+            var server = new Server(new ServerConfiguration(ipAddress, tcpPort, udpPort), messenger);
 
-            MessageParser messageParser = new MessageParser(MessageTypeConfig, RecipientType.Server);
+            RegisterDefaultServerMessageTypes(server, types);
+            RegisterUserMessageTypes(types);
+
+            MessageParser messageParser = new MessageParser(types, RecipientType.Server);
 
             server.RegisterDataHandler(messageParser);
 
@@ -69,5 +72,38 @@ namespace GameNet
         /// <returns>The game server.</returns>
         public Server CreateServer(string ipAddress, ushort tcpPort = ServerConfiguration.DEFAULT_PORT, ushort udpPort = ServerConfiguration.DEFAULT_UDP_PORT)
             => CreateServer(IPAddress.Parse(ipAddress), tcpPort, udpPort);
+        
+        /// <summary>
+        /// Register the default message types for a client.
+        /// </summary>
+        /// <param name="client">The client.</param>
+        /// <param name="types">The message type config.</param>
+        void RegisterDefaultClientMessageTypes(Client client, MessageTypeConfig types)
+        {
+            types.RegisterMessageType<ClientUdpPortMessage>(ClientUdpPortMessage.TypeId, ClientUdpPortMessage.TypeForClient());
+            types.RegisterMessageType<ServerUdpPortMessage>(ServerUdpPortMessage.TypeId, ServerUdpPortMessage.TypeForClient(client));
+        }
+
+        /// <summary>
+        /// Register the default message types for a server.
+        /// </summary>
+        /// <param name="server">The server.</param>
+        /// <param name="types">The message type config.</param>
+        void RegisterDefaultServerMessageTypes(Server server, MessageTypeConfig types)
+        {
+            types.RegisterMessageType<ServerUdpPortMessage>(ServerUdpPortMessage.TypeId, ServerUdpPortMessage.TypeForServer());
+            types.RegisterMessageType<ClientUdpPortMessage>(ClientUdpPortMessage.TypeId, ClientUdpPortMessage.TypeForServer(server));
+        }
+
+        /// <summary>
+        /// Register the user registered message types in a message type config.
+        /// </summary>
+        /// <param name="types">The message type config.</param>
+        void RegisterUserMessageTypes(MessageTypeConfig types)
+        {
+            foreach (KeyValuePair<Type, IMessageType> entry in _messageTypes) {
+                types.RegisterMessageType(entry.Key, entry.Value);
+            }
+        }
     }
 }

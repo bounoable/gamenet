@@ -27,12 +27,15 @@ namespace GameNet.Messaging
         /// <param name="data">The received data.</param>
         public void Handle(byte[] data)
         {
+            // Check if the data contains at least the message type id.
+            if (data.Length < sizeof(int))
+                return;
+            
             IPacket packet = ParsePacket(data);
             IMessageType type = typeConfig.GetTypeById(packet.MessageTypeId);
 
-            if (type == null) {
+            if (type == null)
                 return;
-            }
 
             object obj = type.Serializer.Deserialize(data.Skip(sizeof(int)).ToArray());
 

@@ -1,16 +1,16 @@
 using System;
 using System.Net.Sockets;
 
-namespace GameNet
+namespace GameNet.Events
 {
     public class ClientConnectedEventArgs: EventArgs
     {
-        public TcpClient TcpClient { get; }
+        public ClientContainer Client { get; }
         public DateTime ConnectedAt { get; } = DateTime.Now;
 
-        public ClientConnectedEventArgs(TcpClient client)
+        public ClientConnectedEventArgs(ClientContainer client)
         {
-            TcpClient = client;
+            Client = client;
         }
     }
 }
