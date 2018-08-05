@@ -1,4 +1,4 @@
-namespace GameNet.Messaging
+namespace GameNet.Protocol
 {
     public interface IPacket
     {

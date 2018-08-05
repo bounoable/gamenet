@@ -1,4 +1,4 @@
-namespace GameNet.Messaging
+namespace GameNet.Messages
 {
     abstract public class ServerMessageHandler<T>: MessageHandler<T>
     {

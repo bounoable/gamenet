@@ -1,4 +1,4 @@
-namespace GameNet.Messaging
+namespace GameNet.Messages
 {
     public interface IObjectSerializer
     {

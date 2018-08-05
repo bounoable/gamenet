@@ -1,6 +1,7 @@
 using System;
+using GameNet.Support;
 
-namespace GameNet.Messaging
+namespace GameNet.Messages
 {
     abstract public class ObjectSerializer<T>: IObjectSerializer
     {

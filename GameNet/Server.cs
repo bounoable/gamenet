@@ -5,7 +5,7 @@ using GameNet.Debug;
 using GameNet.Events;
 using System.Threading;
 using GameNet.Messages;
-using GameNet.Messaging;
+using GameNet.Protocol;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -34,7 +34,7 @@ namespace GameNet
         public event EventHandler<UdpPortsExchangedEventArgs> UdpPortsExchanged = delegate {};
         #endregion
 
-        TcpListener _socket;
+        TcpListener _listener;
         protected Messenger _messenger;
 
         protected Dictionary<int, ClientContainer> _clients = new Dictionary<int, ClientContainer>();
@@ -96,9 +96,9 @@ namespace GameNet
         /// </summary>
         public void Start()
         {
-            _socket = new TcpListener(IPAddress, Port);
+            _listener = new TcpListener(IPAddress, Port);
 
-            _socket.Start();
+            _listener.Start();
 
             Active = true;
 
@@ -114,7 +114,7 @@ namespace GameNet
 
             RemoveClients();
 
-            _socket.Stop();
+            _listener.Stop();
         }
 
         /// <summary>
@@ -124,7 +124,7 @@ namespace GameNet
         {
             while (AcceptsClients) {
                 try {
-                    TcpClient client = await _socket.AcceptTcpClientAsync();
+                    TcpClient client = await _listener.AcceptTcpClientAsync();
                     ClientContainer container = new ClientContainer(client);
 
                     _clients[nextClientId] = container;

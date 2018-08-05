@@ -1,6 +1,6 @@
 using System;
 
-namespace GameNet.Messaging
+namespace GameNet.Messages
 {
     public class MessageType<T>: IMessageType
     {

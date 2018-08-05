@@ -2,7 +2,7 @@ using System;
 using System.Net;
 using GameNet.Debug;
 using GameNet.Messages;
-using GameNet.Messaging;
+using GameNet.Protocol;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using System.Collections.Generic;

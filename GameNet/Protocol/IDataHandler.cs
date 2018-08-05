@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace GameNet.Messaging
+namespace GameNet.Protocol
 {
     public interface IDataHandler
     {

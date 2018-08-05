@@ -1,9 +1,11 @@
 using System;
 using System.Linq;
+using GameNet.Support;
+using GameNet.Protocol;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 
-namespace GameNet.Messaging
+namespace GameNet.Messages
 {
     public class MessageParser: IDataHandler
     {

@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using System.Text;
 
-namespace GameNet.Messaging
+namespace GameNet.Messages
 {
     abstract public class MessageHandler<T>: IMessageHandler
     {

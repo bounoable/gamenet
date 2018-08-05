@@ -1,4 +1,4 @@
-using GameNet.Messaging;
+using GameNet.Protocol;
 using GameNet.Messages.Handlers;
 using GameNet.Messages.Serializers;
 

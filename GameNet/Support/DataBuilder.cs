@@ -2,7 +2,7 @@ using System;
 using System.Text;
 using System.Collections.Generic;
 
-namespace GameNet.Messaging
+namespace GameNet.Support
 {
     public class DataBuilder
     {

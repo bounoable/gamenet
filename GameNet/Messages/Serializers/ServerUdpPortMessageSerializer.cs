@@ -1,4 +1,4 @@
-using GameNet.Messaging;
+using GameNet.Protocol;
 
 namespace GameNet.Messages.Serializers
 {

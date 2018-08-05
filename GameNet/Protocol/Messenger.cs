@@ -2,11 +2,12 @@ using System;
 using System.IO;
 using System.Net;
 using System.Linq;
+using GameNet.Messages;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 
-namespace GameNet.Messaging
+namespace GameNet.Protocol
 {
     public class Messenger
     {
