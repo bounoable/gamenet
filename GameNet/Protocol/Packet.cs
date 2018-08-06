@@ -1,3 +1,7 @@
+using System;
+using System.Linq;
+using GameNet.Support;
+
 namespace GameNet.Protocol
 {
     public class Packet: IPacket
@@ -5,18 +9,17 @@ namespace GameNet.Protocol
         /// <summary>
         /// The message type id.
         /// </summary>
-        /// <value></value>
         public int MessageTypeId { get; }
 
         /// <summary>
-        /// The message data.
+        /// The payload.
         /// </summary>
-        public byte[] Data { get; }
+        public byte[] Payload { get; }
 
-        public Packet(int messageTypeId, byte[] data)
+        public Packet(int typeId, byte[] payload)
         {
-            MessageTypeId = messageTypeId;
-            Data = data;
+            MessageTypeId = typeId;
+            Payload = payload;
         }
     }
 }

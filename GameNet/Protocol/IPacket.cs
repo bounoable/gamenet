@@ -8,8 +8,8 @@ namespace GameNet.Protocol
         int MessageTypeId { get; }
 
         /// <summary>
-        /// The message data.
+        /// The packet payload.
         /// </summary>
-        byte[] Data { get; }
+        byte[] Payload { get; }
     }
 }

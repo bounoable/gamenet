@@ -151,14 +151,9 @@ namespace GameNet.Protocol
         /// <param name="packet">The packet to transform.</param>
         /// <returns>The prepared packet as a byte array.</returns>
         byte[] PreparePacket(IPacket packet)
-        {
-            List<byte> data = new List<byte>();
-
-            data.AddRange(ToLittleEndian(BitConverter.GetBytes(packet.MessageTypeId)));
-            data.AddRange(ToLittleEndian(packet.Data));
-
-            return data.ToArray();
-        }
+            => ToLittleEndian(BitConverter.GetBytes(packet.MessageTypeId))
+                .Concat(ToLittleEndian(packet.Payload))
+                .ToArray();
 
         /// <summary>
         /// Transform a byte array to little endian if the operating system uses big endian.
