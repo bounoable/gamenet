@@ -12,6 +12,11 @@ namespace GameNet
     public class Client: Endpoint
     {
         /// <summary>
+        /// The client configuration.
+        /// </summary>
+        public ClientConfiguration Config { get; }
+
+        /// <summary>
         /// Indicates if the client is currently connected to the server.
         /// </summary>
         public bool Connected { get; private set; }
@@ -31,12 +36,13 @@ namespace GameNet
         /// </summary>
         /// <param name="config">The configuration.</param>
         /// <param name="messenger">The messenger.</param>
-        public Client(NetworkConfiguration config, Messenger messenger): base(config)
+        public Client(ClientConfiguration config, Messenger messenger): base(config)
         {
             if (messenger == null) {
                 throw new ArgumentNullException("messenger");
             }
 
+            Config = config;
             _messenger = messenger;
         }
 
@@ -59,6 +65,7 @@ namespace GameNet
             Connected = true;
 
             Task.Run(() => ReceiveData(_tcpServer));
+            Task.Run(() => BeginSendStillConnectedMessages());
         }
 
         /// <summary>
@@ -104,6 +111,20 @@ namespace GameNet
                 throw new ArgumentOutOfRangeException($"Invalid port ({port}). Port must be between 1 and 65535.");
             }
         }
+
+        async Task BeginSendStillConnectedMessages()
+        {
+            while (Connected) {
+                await Task.Delay(Config.StillConnectedInterval);
+                await SendStillConnectedMessage();
+            }
+        }
+
+        /// <summary>
+        /// Send a still connected message to the server.
+        /// </summary>
+        Task<byte[]> SendStillConnectedMessage()
+            => Send(new SystemMessage(SystemMessage.MessageType.StillConnected));
 
         /// <summary>
         /// Register the server's UDP port.

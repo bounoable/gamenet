@@ -24,5 +24,23 @@ namespace GameNet.Messages
             Handler = handler;
             Serializer = serializer;
         }
+
+        /// <summary>
+        /// Define a message type for the message parser.
+        /// </summary>
+        /// <param name="serializer">The object serializer.</param>
+        public MessageType(IObjectSerializer serializer)
+        {
+            Serializer = serializer;
+        }
+
+        /// <summary>
+        /// Define a message type for the message parser.
+        /// </summary>
+        /// <param name="handler">The object handler.</param>
+        public MessageType(IMessageHandler handler)
+        {
+            Handler = handler;
+        }
     }
 }

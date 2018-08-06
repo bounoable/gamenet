@@ -133,9 +133,6 @@ namespace GameNet
                     Task.Run(() => ReceiveData(client));
                     Task.Run(() => SendUdpPortTo(container));
 
-                    // TODO: Regelmäßiger Check ob TCP connection noch besteht.
-                    // Events implementieren
-
                     ClientConnected(this, new ClientConnectedEventArgs(container));
                 } catch (ObjectDisposedException e) {}
             }

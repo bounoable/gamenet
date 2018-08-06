@@ -129,7 +129,7 @@ namespace GameNet.Protocol
         {
             IMessageType type = typeConfig.GetType<T>();
 
-            if (type == null) {
+            if (type == null || type.Serializer == null) {
                 return null;
             }
 

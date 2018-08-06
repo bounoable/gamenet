@@ -36,7 +36,7 @@ namespace GameNet.Messages
             IPacket packet = ParsePacket(data);
             IMessageType type = typeConfig.GetTypeById(packet.MessageTypeId);
 
-            if (type == null)
+            if (type == null || type.Serializer == null)
                 return;
 
             object obj = type.Serializer.Deserialize(data.Skip(sizeof(int)).ToArray());

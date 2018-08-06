@@ -18,6 +18,14 @@ namespace GameNet
         /// <typeparam name="T">The object type of the message.</typeparam>
         public void RegisterMessageType<T>(IMessageType messageType)
             => _messageTypes[typeof(T)] = messageType;
+        
+        /// <summary>
+        /// Register a message type for both the server and the client.
+        /// </summary>
+        /// <param name="serializer">The message object serializer.</param>
+        /// <typeparam name="T">The object type of the message.</typeparam>
+        public void RegisterMessageType<T>(IObjectSerializer serializer, IMessageHandler handler)
+            => RegisterMessageType<T>(new MessageType<T>(serializer, handler));
 
         /// <summary>
         /// Create a game client.
@@ -28,7 +36,7 @@ namespace GameNet
         {
             var types = new MessageTypeConfig();
             var messenger = new Messenger(types);
-            var client = new Client(new NetworkConfiguration(udpPort), messenger);
+            var client = new Client(new ClientConfiguration(udpPort), messenger);
 
             RegisterDefaultClientMessageTypes(client, types);
             RegisterUserMessageTypes(types);
