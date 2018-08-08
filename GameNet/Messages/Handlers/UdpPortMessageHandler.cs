@@ -2,27 +2,23 @@ using GameNet.Protocol;
 
 namespace GameNet.Messages.Handlers
 {
-    public class UdpPortMessageHandler: MessageHandler<UdpPortMessage>
+    public class UdpPortMessageHandler<TSender>: MessageHandler<UdpPortMessage<TSender>>
     {
-        Server server;
-        Client client;
+        Server _server;
+        Client _client;
 
         public UdpPortMessageHandler(Server server)
-        {
-            this.server = server;
-        }
+            => _server = server;
 
         public UdpPortMessageHandler(Client client)
-        {
-            this.client = client;
-        }
+            => _client = client;
 
-        override protected void HandleMessage(UdpPortMessage message)
+        override protected void HandleMessage(UdpPortMessage<TSender> message)
         {
-            if (client != null) {
-                client.RegisterServerUdpPort(message);
-            } else if (server != null) {
-                server.RegisterClientUdpPort(message);
+            if (_client != null && message is UdpPortMessage<Server>) {
+                _client.RegisterServerUdpPort((IUdpPortMessage)message);
+            } else if (_server != null && message is UdpPortMessage<Client>) {
+                _server.RegisterClientUdpPort((IUdpPortMessage)message);
             }
         }
     }

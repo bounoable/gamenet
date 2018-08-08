@@ -1,31 +1,24 @@
 using GameNet.Protocol;
 using GameNet.Messages.Handlers;
+using System.Collections.Generic;
 using GameNet.Messages.Serializers;
 
 namespace GameNet.Messages
 {
-    public class UdpPortMessage: IMessageType
+    public class UdpPortMessage<TSender>: IUdpPortMessage
     {
-        public string Secret { get; }
         public ushort Port { get; }
-        public IObjectSerializer Serializer { get; protected set; }
-        public IMessageHandler Handler { get; protected set; }
+        public string Secret { get; }
 
-        public UdpPortMessage(IObjectSerializer serializer)
+        public UdpPortMessage(ushort port)
         {
-            Serializer = serializer;
-        }
-
-        public UdpPortMessage(IObjectSerializer serializer, IMessageHandler handler)
-        {
-            Serializer = serializer;
-            Handler = handler;
-        }
-
-        public UdpPortMessage(string secret, ushort port)
-        {
-            Secret = secret;
             Port = port;
+        }
+
+        public UdpPortMessage(ushort port, string secret)
+        {
+            Port = port;
+            Secret = secret;
         }
     }
 }

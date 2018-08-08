@@ -2,7 +2,7 @@ using System;
 
 namespace GameNet.Messages
 {
-    abstract public class AcknowledgeMessage: IAcknowledgeMessage
+    public class AcknowledgeMessage: IAcknowledgeMessage
     {
         public static int AckTokenSize
         {

@@ -99,6 +99,7 @@ namespace GameNet
             _listener = new TcpListener(IPAddress, Port);
 
             _listener.Start();
+            _messenger.Init();
 
             Active = true;
 
@@ -125,13 +126,17 @@ namespace GameNet
             while (AcceptsClients) {
                 try {
                     TcpClient client = await _listener.AcceptTcpClientAsync();
-                    ClientContainer container = new ClientContainer(client);
+                    ClientContainer container = new ClientContainer(client, DateTime.Now);
 
                     _clients[nextClientId] = container;
                     nextClientId++;
 
                     Task.Run(() => ReceiveData(client));
-                    Task.Run(() => SendUdpPortTo(container));
+
+                    Task.Run(async () => {
+                        await SendSecretTo(container);
+                        await SendUdpPortTo(container);
+                    });
 
                     ClientConnected(this, new ClientConnectedEventArgs(container));
                 } catch (ObjectDisposedException e) {}
@@ -185,21 +190,40 @@ namespace GameNet
         }
 
         /// <summary>
+        /// Find a client by it's secret.
+        /// </summary>
+        /// <param name="secret">The client secret.</param>
+        /// <returns>The client container.</returns>
+        public ClientContainer GetClientBySecret(string secret)
+        {
+            foreach (ClientContainer client in _clients.Values) {
+                if (client.Secret == secret) {
+                    return client;
+                }
+            }
+
+            return null;
+        }
+
+        async Task<byte[]> SendSecretTo(ClientContainer client)
+            => await SendTo(client, new ClientSecretMessage(client.Secret));
+        
+        /// <summary>
         /// Send a UDP port message containing the server's local UDP port to a client.
         /// </summary>
         /// <param name="client">The client container.</param>
         /// <returns>The sent bytes.</returns>
         async Task<byte[]> SendUdpPortTo(ClientContainer client)
-            => await SendTo<ServerUdpPortMessage>(client, new ServerUdpPortMessage(client.SecretToken, NetworkConfig.LocalUdpPort));
+            => await SendTo(client, new UdpPortMessage<Server>(NetworkConfig.LocalUdpPort));
 
         /// <summary>
         /// Register a client's local UDP port.
         /// </summary>
         /// <param name="message">The UDP port message.</param>
-        public void RegisterClientUdpPort(UdpPortMessage message)
+        public void RegisterClientUdpPort(IUdpPortMessage message)
         {
             foreach (ClientContainer client in _clients.Values) {
-                if (client.SecretToken != message.Secret)
+                if (client.Secret != message.Secret)
                     continue;
                 
                 client.UdpEndpoint = (IPEndPoint)client.TcpClient.Client.RemoteEndPoint;
@@ -212,6 +236,13 @@ namespace GameNet
                 return;
             }
         }
+
+        /// <summary>
+        /// Notify the server about a received heartbeat from a client.
+        /// </summary>
+        /// <param name="clientSecret">The client's secret.</param>
+        public void NotifyHeartbeat(string clientSecret)
+            => GetClientBySecret(clientSecret)?.UpdateHearbeat();
 
         /// <summary>
         /// Send data to the clients.

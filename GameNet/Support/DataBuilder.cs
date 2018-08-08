@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using System.Linq;
 using System.Collections.Generic;
 
 namespace GameNet.Support
@@ -44,11 +45,25 @@ namespace GameNet.Support
         public DataBuilder Byte(byte value) => Append(value);
 
         /// <summary>
+        /// Append bytes to the data.
+        /// </summary>
+        /// <param name="value">The bytes to append.</param>
+        /// <returns>The data builder.</returns>
+        public DataBuilder Bytes(byte[] value) => Append(value);
+
+        /// <summary>
         /// Append an sbyte to the data.
         /// </summary>
         /// <param name="value">The sbyte to append.</param>
         /// <returns>The data builder.</returns>
         public DataBuilder SByte(sbyte value) => Append(unchecked((byte)value));
+
+        /// <summary>
+        /// Append sbytes to the data.
+        /// </summary>
+        /// <param name="value">The sbytes to append.</param>
+        /// <returns>The data builder.</returns>
+        public DataBuilder SBytes(sbyte[] value) => Append(value.Select(sb => unchecked((byte)sb)).ToArray());
 
         /// <summary>
         /// Append a boolean to the data.
@@ -126,10 +141,10 @@ namespace GameNet.Support
         /// <param name="value">The string to append.</param>
         /// <returns>The data builder.</returns>
         public DataBuilder String(string value)
-        {
+        {   
             Int(value.Length);
 
-            return Append(Encoding.Unicode.GetBytes(value));
+            return value.Length > 0 ? Append(Encoding.Unicode.GetBytes(value)) : this;
         }
 
         /// <summary>

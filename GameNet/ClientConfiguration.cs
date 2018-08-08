@@ -2,21 +2,21 @@ namespace GameNet
 {
     public class ClientConfiguration: NetworkConfiguration
     {
-        public const int DEFAULT_STILL_CONNECTED_INTERVAL = 10;
+        public const int DEFAULT_HEARTBEAT_INTERVAL = 20000;
 
-        public int StillConnectedInterval { get; set; } = DEFAULT_STILL_CONNECTED_INTERVAL;
+        public int HeartbeatInterval { get; set; } = DEFAULT_HEARTBEAT_INTERVAL;
 
         public ClientConfiguration()
         {}
 
-        public ClientConfiguration(int stillConnectedInterval)
+        public ClientConfiguration(int heartbeatInterval)
         {
-            StillConnectedInterval = stillConnectedInterval;
+            HeartbeatInterval = heartbeatInterval;
         }
 
-        public ClientConfiguration(int stillConnectedInterval, ushort localUdpPort): base(localUdpPort)
+        public ClientConfiguration(int heartbeatInterval, ushort localUdpPort): base(localUdpPort)
         {
-            StillConnectedInterval = stillConnectedInterval;
+            HeartbeatInterval = heartbeatInterval;
         }
 
         public ClientConfiguration(ushort localUdpPort): base(localUdpPort)

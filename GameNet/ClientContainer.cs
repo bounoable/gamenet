@@ -11,6 +11,10 @@ namespace GameNet
         static Random _rand = new Random();
         static Base62Converter _tokenGenerator = new Base62Converter();
 
+        public string Secret { get; }
+        public DateTime JoinedAt { get; }
+        public DateTime LastHeartbeat { get; private set; }
+
         public TcpClient TcpClient
         {
             get => _tcpClient;
@@ -33,16 +37,19 @@ namespace GameNet
             }
         }
 
-        public string SecretToken { get; }
-
         TcpClient _tcpClient;
         IPEndPoint _udpEndpoint;
 
-        public ClientContainer()
-        {}
-
-        public ClientContainer(TcpClient tcpClient = null, IPEndPoint udpEndpoint = null)
+        public ClientContainer(DateTime joinedAt)
         {
+            JoinedAt = joinedAt;
+            LastHeartbeat = JoinedAt;
+        }
+
+        public ClientContainer(TcpClient tcpClient, IPEndPoint udpEndpoint, DateTime joinedAt)
+        {
+            JoinedAt = joinedAt;
+            LastHeartbeat = JoinedAt;
             _tcpClient = tcpClient;
             _udpEndpoint = udpEndpoint;
 
@@ -51,7 +58,27 @@ namespace GameNet
 
             string hex = BitConverter.ToString(buffer).Replace("-", string.Empty);
 
-            SecretToken = _tokenGenerator.Encode(hex);
+            Secret = _tokenGenerator.Encode(hex);
         }
+
+        public ClientContainer(TcpClient tcpClient, DateTime joinedAt)
+        {
+            JoinedAt = joinedAt;
+            LastHeartbeat = JoinedAt;
+            _tcpClient = tcpClient;
+
+            byte[] buffer = new byte[8];
+            _rand.NextBytes(buffer);
+
+            string hex = BitConverter.ToString(buffer).Replace("-", string.Empty);
+
+            Secret = _tokenGenerator.Encode(hex);
+        }
+
+        /// <summary>
+        /// Update the client's heartbeat.
+        /// </summary>
+        public void UpdateHearbeat()
+            => LastHeartbeat = DateTime.Now;
     }
 }

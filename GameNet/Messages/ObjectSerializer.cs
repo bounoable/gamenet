@@ -52,23 +52,36 @@ namespace GameNet.Messages
         /// Pull a byte from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The byte.</returns>
         public static byte PullByte(ref byte[] data) => DataHelper.PullByte(ref data);
+
+        /// <summary>
+        /// Pull bytes from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="count">The count.</param>
+        /// <returns>The byte.</returns>
+        public static byte[] PullBytes(ref byte[] data, int count) => DataHelper.PullBytes(ref data, count);
 
         /// <summary>
         /// Pull an sbyte from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The sbyte.</returns>
         public static sbyte PullSByte(ref byte[] data) => DataHelper.PullSByte(ref data);
+
+        /// <summary>
+        /// Pull sbytes from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="count">The count.</param>
+        /// <returns>The sbytes.</returns>
+        public static sbyte[] PullSBytes(ref byte[] data, int count) => DataHelper.PullSBytes(ref data, count);
 
         /// <summary>
         /// Pull a boolean from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The boolean.</returns>
         protected static bool PullBool(ref byte[] data) => DataHelper.PullBool(ref data);
 
@@ -76,7 +89,6 @@ namespace GameNet.Messages
         /// Pull a short (16 bit int) from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The short (16 bit int).</returns>
         protected static short PullShort(ref byte[] data) => DataHelper.PullShort(ref data);
 
@@ -84,7 +96,6 @@ namespace GameNet.Messages
         /// Pull a ushort (unsigned 16 bit int) from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The ushort (unsigned 16 bit int).</returns>
         protected static ushort PullUShort(ref byte[] data) => DataHelper.PullUShort(ref data);
 
@@ -92,7 +103,6 @@ namespace GameNet.Messages
         /// Pull an integer from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The integer.</returns>
         protected static int PullInt(ref byte[] data) => DataHelper.PullInt(ref data);
 
@@ -100,7 +110,6 @@ namespace GameNet.Messages
         /// Pull an integer from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The integer.</returns>
         protected static uint PullUInt(ref byte[] data) => DataHelper.PullUInt(ref data);
 
@@ -108,7 +117,6 @@ namespace GameNet.Messages
         /// Pull a long from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The long.</returns>
         public static long PullLong(ref byte[] data) => DataHelper.PullLong(ref data);
 
@@ -116,7 +124,6 @@ namespace GameNet.Messages
         /// Pull a ulong from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The ulong.</returns>
         public static ulong PullULong(ref byte[] data) => DataHelper.PullULong(ref data);
 
@@ -124,7 +131,6 @@ namespace GameNet.Messages
         /// Pull a float from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The float.</returns>
         protected static float PullFloat(ref byte[] data) => DataHelper.PullFloat(ref data);
 
@@ -132,7 +138,6 @@ namespace GameNet.Messages
         /// Pull a double from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The double.</returns>
         protected static double GetDouble(ref byte[] data) => DataHelper.PullDouble(ref data);
 
@@ -140,7 +145,6 @@ namespace GameNet.Messages
         /// Pull a char from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The char.</returns>
         protected static char PullChar(ref byte[] data) => DataHelper.PullChar(ref data);
 
@@ -148,7 +152,6 @@ namespace GameNet.Messages
         /// Pull a string from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The string.</returns>
         protected static string PullString(ref byte[] data) => DataHelper.PullString(ref data);
 
@@ -156,7 +159,6 @@ namespace GameNet.Messages
         /// Pull an enum value from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The enum value.</returns>
         protected static TEnum PullEnum<TEnum>(ref byte[] data) where TEnum: Enum => DataHelper.PullEnum<TEnum>(ref data);
     }

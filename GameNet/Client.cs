@@ -21,6 +21,11 @@ namespace GameNet
         /// </summary>
         public bool Connected { get; private set; }
 
+        /// <summary>
+        /// The client's session secret.
+        /// </summary>
+        public string Secret { get; set; }
+
         protected IPEndPoint ServerUdpEndpoint { get; private set; }
 
         /// <summary>
@@ -61,11 +66,11 @@ namespace GameNet
             ValidatePort(port);
 
             _tcpServer.Connect(ipAddress, port);
+            _messenger.Init();
 
             Connected = true;
 
             Task.Run(() => ReceiveData(_tcpServer));
-            Task.Run(() => BeginSendStillConnectedMessages());
         }
 
         /// <summary>
@@ -112,42 +117,42 @@ namespace GameNet
             }
         }
 
-        async Task BeginSendStillConnectedMessages()
+        /// <summary>
+        /// Periodically send a heartbeat message to the server.
+        /// </summary>
+        async public Task BeginHeartbeatMessages()
         {
-            while (Connected) {
-                await Task.Delay(Config.StillConnectedInterval);
-                await SendStillConnectedMessage();
+            while (Connected && !string.IsNullOrEmpty(Secret)) {
+                await SendHeartbeatMessage();
+                await Task.Delay(Config.HeartbeatInterval);
             }
         }
 
         /// <summary>
         /// Send a still connected message to the server.
         /// </summary>
-        Task<byte[]> SendStillConnectedMessage()
-            => Send(new SystemMessage(SystemMessage.MessageType.StillConnected));
+        Task<byte[]> SendHeartbeatMessage()
+            => Send(new ClientSystemMessage(ClientSystemMessage.MessageType.Heartbeat, Secret));
 
         /// <summary>
         /// Register the server's UDP port.
         /// </summary>
         /// <param name="message">The UDP port message from the server.</param>
-        public void RegisterServerUdpPort(UdpPortMessage message)
+        public void RegisterServerUdpPort(IUdpPortMessage message)
         {
-            string secret = message.Secret;
-
             ServerUdpEndpoint = (IPEndPoint)_tcpServer.Client.RemoteEndPoint;
             ServerUdpEndpoint.Port = message.Port;
 
             Task.Run(() => ReceiveData(_udpClient, ServerUdpEndpoint));
-            Task.Run(() => SendUdpPortToServer(secret));
+            Task.Run(() => SendUdpPortToServer());
         }
 
         /// <summary>
         /// Send the client's local UDP port to the server.
         /// </summary>
-        /// <param name="secret">The UDP port message secret.</param>
         /// <returns>The sent bytes.</returns>
-        async Task<byte[]> SendUdpPortToServer(string secret)
-            => await Send<ClientUdpPortMessage>(new ClientUdpPortMessage(secret, NetworkConfig.LocalUdpPort));
+        async Task<byte[]> SendUdpPortToServer()
+            => await Send(new UdpPortMessage<Client>(NetworkConfig.LocalUdpPort, Secret));
         
         /// <summary>
         /// Send data to the server and return the sent data.

@@ -19,7 +19,7 @@ namespace GameNet.Messages
         /// </summary>
         /// <param name="serializer">The object serializer.</param>
         /// <param name="handler">The object handler.</param>
-        public MessageType(IObjectSerializer serializer, IMessageHandler handler)
+        public MessageType(IObjectSerializer serializer = null, IMessageHandler handler = null)
         {
             Handler = handler;
             Serializer = serializer;

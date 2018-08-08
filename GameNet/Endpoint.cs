@@ -53,7 +53,7 @@ namespace GameNet
 
                     await stream.ReadAsync(data, 0, client.ReceiveBufferSize);
                     
-                    HandleReceivedData(data);
+                    HandleReceivedData(data, new TcpRecipient(client));
                 }
             }
         }
@@ -63,7 +63,6 @@ namespace GameNet
         /// </summary>
         /// <param name="client">The UDP client.</param>
         /// <param name="endpoint">The remote endpoint</param>
-        /// <returns></returns>
         protected async Task ReceiveData(UdpClient client, IPEndPoint endpoint)
         {
             await Task.Run(() => {
@@ -73,7 +72,7 @@ namespace GameNet
                     if (data.Length == 0)
                         continue;
 
-                    HandleReceivedData(data);
+                    HandleReceivedData(data, new UdpRecipient(client, endpoint));
                 }
             });
         }
@@ -82,10 +81,11 @@ namespace GameNet
         /// Call the registered data handlers.
         /// </summary>
         /// <param name="data">The received data.</param>
-        protected void HandleReceivedData(byte[] data)
+        /// <param name="recipient">The sender of the data.</param>
+        protected void HandleReceivedData(byte[] data, IRecipient sender)
         {
             foreach (IDataHandler handler in _dataHandlers) {
-                handler.Handle(data);
+                handler.Handle(data, sender);
             }
         }
     }

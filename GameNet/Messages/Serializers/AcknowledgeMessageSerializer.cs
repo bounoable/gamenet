@@ -1,8 +1,8 @@
 namespace GameNet.Messages.Serializers
 {
-    abstract public class AcknowledgeMessageSerializer<T>: ObjectSerializer<T> where T: AcknowledgeMessage
+    public class AcknowledgeMessageSerializer: ObjectSerializer<AcknowledgeMessage>
     {
-        override public byte[] GetBytes(T message) => message.AckToken;
-        override abstract public T GetObject(byte[] data);
+        override public byte[] GetBytes(AcknowledgeMessage message) => message.AckToken;
+        override public AcknowledgeMessage GetObject(byte[] ackToken) => new AcknowledgeMessage(ackToken);
     }
 }

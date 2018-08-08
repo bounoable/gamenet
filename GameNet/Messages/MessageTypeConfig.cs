@@ -74,20 +74,30 @@ namespace GameNet.Messages
         /// <typeparam name="T">The object type of the messages.</typeparam>
         public void RegisterMessageType<T>(IMessageType type)
             => RegisterMessageType<T>(GetNextTypeId(), type);
+        
+        /// <summary>
+        /// Register a message type.
+        /// </summary>
+        /// <param name="id">The message type id.</param>
+        /// <param name="serializer">The object serializer.</param>
+        /// <param name="handler">The message handler.</param>
+        /// <typeparam name="T">The object type of the messages.</typeparam>
+        public void RegisterMessageType<T>(int id, IObjectSerializer serializer = null, IMessageHandler handler = null)
+            => RegisterMessageType<T>(id, new MessageType<T>(serializer, handler));
 
         /// <summary>
         /// Register a message type and return it's ID.
         /// </summary>
         /// <param name="serializer">The object serializer.</param>
-        /// <param name="handler">The object handler.</param>
+        /// <param name="handler">The message handler.</param>
         /// <returns>The generated type id.</returns>
-        public int RegisterMessageType<T>(IObjectSerializer serializer, IMessageHandler handler)
+        public int RegisterMessageType<T>(IObjectSerializer serializer = null, IMessageHandler handler = null)
         {
-            int typeId = GetNextTypeId();
+            int id = GetNextTypeId();
 
-            RegisterMessageType<T>(typeId, new MessageType<T>(serializer, handler));
+            RegisterMessageType<T>(id, serializer, handler);
 
-            return typeId;
+            return id;
         }
         
         /// <summary>

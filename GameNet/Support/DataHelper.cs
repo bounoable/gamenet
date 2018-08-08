@@ -126,6 +126,16 @@ namespace GameNet.Support
             => data[offset];
         
         /// <summary>
+        /// Get bytes from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="offset">The offset.</param>
+        /// <param name="count">The count.</param>
+        /// <returns>The byte.</returns>
+        public static byte[] GetBytes(byte[] data, int offset = 0, int count = 1)
+            => data.Skip(offset).Take(count).ToArray();
+        
+        /// <summary>
         /// Get an sbyte from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
@@ -133,6 +143,16 @@ namespace GameNet.Support
         /// <returns>The sbyte.</returns>
         public static sbyte GetSByte(byte[] data, int offset = 0)
             => unchecked((sbyte)data[offset]);
+
+        /// <summary>
+        /// Get sbytes from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="offset">The offset.</param>
+        /// <param name="count">The count.</param>
+        /// <returns>The sbyte.</returns>
+        public static sbyte[] GetSBytes(byte[] data, int offset = 0, int count = 1)
+            => data.Skip(offset).Take(count).Select(sb => unchecked((sbyte)sb)).ToArray();
 
         /// <summary>
         /// Get a boolean from a data buffer.
@@ -231,7 +251,15 @@ namespace GameNet.Support
         /// <param name="offset">The offset.</param>
         /// <returns>The string.</returns>
         public static string GetString(byte[] data, int offset = 0)
-            => ConvertToString(Slice(data, offset + sizeof(int), GetInt(data, offset) * sizeof(char)));
+        {
+            int length = GetInt(data, offset);
+
+            if (length == 0) {
+                return string.Empty;
+            }
+
+            return ConvertToString(Slice(data, offset + sizeof(int), length * sizeof(char)));
+        }
         
         /// <summary>
         /// Get an enum from a data buffer.
@@ -242,41 +270,38 @@ namespace GameNet.Support
         public static T GetEnum<T>(byte[] data, int offset = 0) where T: Enum
         {
             Type enumType = Enum.GetUnderlyingType(typeof(T));
-            int size = Marshal.SizeOf(enumType);
-            byte[] enumBytes = Slice(data, offset, size);
 
             if (enumType == typeof(short)) {
-                return (T)(object)ConvertToShort(enumBytes);
+                return (T)(object)ConvertToShort(Slice(data, offset, sizeof(short)));
             }
 
             if (enumType == typeof(ushort)) {
-                return (T)(object)ConvertToShort(enumBytes);
+                return (T)(object)ConvertToShort(Slice(data, offset, sizeof(ushort)));
             }
 
             if (enumType == typeof(int)) {
-                return (T)(object)ConvertToInt(enumBytes);
+                return (T)(object)ConvertToInt(Slice(data, offset, sizeof(int)));
             }
 
             if (enumType == typeof(uint)) {
-                return (T)(object)ConvertToUInt(enumBytes);
+                return (T)(object)ConvertToUInt(Slice(data, offset, sizeof(uint)));
             }
 
             if (enumType == typeof(long)) {
-                return (T)(object)ConvertToLong(enumBytes);
+                return (T)(object)ConvertToLong(Slice(data, offset, sizeof(long)));
             }
 
             if (enumType == typeof(ulong)) {
-                return (T)(object)ConvertToULong(enumBytes);
+                return (T)(object)ConvertToULong(Slice(data, offset, sizeof(ulong)));
             }
 
-            return (T)(object)ConvertToInt(enumBytes);
+            return (T)(object)ConvertToInt(Slice(data, offset, sizeof(int)));
         }
 
         /// <summary>
         /// Pull a byte from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The byte.</returns>
         public static byte PullByte(ref byte[] data)
         {
@@ -287,10 +312,23 @@ namespace GameNet.Support
         }
 
         /// <summary>
+        /// Pull bytes from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="count">The count.</param>
+        /// <returns>The bytes.</returns>
+        public static byte[] PullBytes(ref byte[] data, int count)
+        {
+            byte[] result = GetBytes(data, 0, count);
+            data = data.Skip(count).ToArray();
+
+            return result;
+        }
+
+        /// <summary>
         /// Pull an sbyte from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The sbyte.</returns>
         public static sbyte PullSByte(ref byte[] data)
         {
@@ -299,12 +337,25 @@ namespace GameNet.Support
 
             return result;
         }
+
+        /// <summary>
+        /// Pull sbytes from a data buffer.
+        /// </summary>
+        /// <param name="data">The data buffer.</param>
+        /// <param name="count">The count.</param>
+        /// <returns>The sbytes.</returns>
+        public static sbyte[] PullSBytes(ref byte[] data, int count = 1)
+        {
+            sbyte[] result = GetSBytes(data, 0, count);
+            data = data.Skip(count).ToArray();
+
+            return result;
+        }
         
         /// <summary>
         /// Pull a boolean from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The boolean.</returns>
         public static bool PullBool(ref byte[] data)
         {
@@ -318,7 +369,6 @@ namespace GameNet.Support
         /// Pull a short (16 bit int) from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The short (16 bit int).</returns>
         public static short PullShort(ref byte[] data)
         {
@@ -332,7 +382,6 @@ namespace GameNet.Support
         /// Pull a ushort (unsigned 16 bit int) from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The ushort (unsigned 16 bit int).</returns>
         public static ushort PullUShort(ref byte[] data)
         {
@@ -346,7 +395,6 @@ namespace GameNet.Support
         /// Pull an integer from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The integer.</returns>
         public static int PullInt(ref byte[] data)
         {
@@ -360,7 +408,6 @@ namespace GameNet.Support
         /// Pull an unsigned integer from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The unsigned integer.</returns>
         public static uint PullUInt(ref byte[] data)
         {
@@ -374,7 +421,6 @@ namespace GameNet.Support
         /// Pull a long from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The long.</returns>
         public static long PullLong(ref byte[] data)
         {
@@ -388,7 +434,6 @@ namespace GameNet.Support
         /// Pull a ulong from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The ulong.</returns>
         public static ulong PullULong(ref byte[] data)
         {
@@ -402,7 +447,6 @@ namespace GameNet.Support
         /// Pull a float from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The float.</returns>
         public static float PullFloat(ref byte[] data)
         {
@@ -416,7 +460,6 @@ namespace GameNet.Support
         /// Pull a double from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The double.</returns>
         public static double PullDouble(ref byte[] data)
         {
@@ -430,7 +473,6 @@ namespace GameNet.Support
         /// Pull a char from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The char.</returns>
         public static char PullChar(ref byte[] data)
         {
@@ -444,7 +486,6 @@ namespace GameNet.Support
         /// Pull a string from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The string.</returns>
         public static string PullString(ref byte[] data)
         {
@@ -458,7 +499,6 @@ namespace GameNet.Support
         /// Pull an enum value from a data buffer.
         /// </summary>
         /// <param name="data">The data buffer.</param>
-        /// <param name="offset">The offset.</param>
         /// <returns>The enum value.</returns>
         public static T PullEnum<T>(ref byte[] data) where T: Enum
         {

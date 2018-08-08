@@ -8,6 +8,7 @@ namespace GameNet.Protocol
         /// Handle received data.
         /// </summary>
         /// <param name="data">The received data.</param>
-        void Handle(byte[] data);
+        /// <param name="sender">The sender of the data.</param>
+        void Handle(byte[] data, IRecipient sender);
     }
 }

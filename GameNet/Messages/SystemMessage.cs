@@ -2,21 +2,16 @@ using System;
 
 namespace GameNet.Messages
 {
-    public class SystemMessage: AcknowledgeMessage
+    public class SystemMessage<T>: AcknowledgeMessage where T: Enum
     {
-        public enum MessageType
-        {
-            StillConnected
-        }
+        public T Type { get; }
 
-        public MessageType Type { get; }
-
-        public SystemMessage(MessageType type): base()
+        public SystemMessage(T type): base()
         {
             Type = type;
         }
 
-        public SystemMessage(MessageType type, byte[] ackToken): base(ackToken)
+        public SystemMessage(T type, byte[] ackToken): base(ackToken)
         {
             Type = type;
         }

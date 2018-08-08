@@ -3,12 +3,16 @@ using System.Net;
 using GameNet.Debug;
 using GameNet.Messages;
 using GameNet.Protocol;
+using GameNet.Messages.Handlers;
 using System.Collections.Generic;
+using GameNet.Messages.Serializers;
 
 namespace GameNet
 {
     public class GameNetFactory
     {
+        public MessengerConfig MessengerConfig { get; } = new MessengerConfig();
+
         readonly Dictionary<Type, IMessageType> _messageTypes = new Dictionary<Type, IMessageType>();
 
         /// <summary>
@@ -35,15 +39,13 @@ namespace GameNet
         public Client CreateClient(ushort udpPort = NetworkConfiguration.DEFAULT_UDP_PORT)
         {
             var types = new MessageTypeConfig();
-            var messenger = new Messenger(types);
+            var messenger = new Messenger(MessengerConfig, types);
             var client = new Client(new ClientConfiguration(udpPort), messenger);
 
             RegisterDefaultClientMessageTypes(client, types);
             RegisterUserMessageTypes(types);
 
-            var messageParser = new MessageParser(types, RecipientType.Client);
-
-            client.RegisterDataHandler(messageParser);
+            client.RegisterDataHandler(messenger);
 
             return client;
         }
@@ -58,15 +60,13 @@ namespace GameNet
         public Server CreateServer(IPAddress ipAddress, ushort tcpPort = ServerConfiguration.DEFAULT_PORT, ushort udpPort = NetworkConfiguration.DEFAULT_UDP_PORT)
         {
             var types = new MessageTypeConfig();
-            var messenger = new Messenger(types);
+            var messenger = new Messenger(MessengerConfig, types);
             var server = new Server(new ServerConfiguration(ipAddress, tcpPort, udpPort), messenger);
 
             RegisterDefaultServerMessageTypes(server, types);
             RegisterUserMessageTypes(types);
 
-            MessageParser messageParser = new MessageParser(types, RecipientType.Server);
-
-            server.RegisterDataHandler(messageParser);
+            server.RegisterDataHandler(messenger);
 
             return server;
         }
@@ -88,8 +88,33 @@ namespace GameNet
         /// <param name="types">The message type config.</param>
         void RegisterDefaultClientMessageTypes(Client client, MessageTypeConfig types)
         {
-            types.RegisterMessageType<ClientUdpPortMessage>(ClientUdpPortMessage.TypeId, ClientUdpPortMessage.TypeForClient());
-            types.RegisterMessageType<ServerUdpPortMessage>(ServerUdpPortMessage.TypeId, ServerUdpPortMessage.TypeForClient(client));
+            types.RegisterMessageType<UdpPortMessage<Client>>(
+                (int)DefaultMessageTypes.ClientUdpPort,
+                new UdpPortMessageSerializer<Client>()
+            );
+
+            types.RegisterMessageType<UdpPortMessage<Server>>(
+                (int)DefaultMessageTypes.ServerUdpPort,
+                new UdpPortMessageSerializer<Server>(),
+                new UdpPortMessageHandler<Server>(client)
+            );
+
+            types.RegisterMessageType<ServerSystemMessage>(
+                (int)DefaultMessageTypes.ServerSystemMessage,
+                new ServerSystemMessageSerializer(),
+                new ServerSystemMessageHandler(client)
+            );
+
+            types.RegisterMessageType<ClientSystemMessage>(
+                (int)DefaultMessageTypes.ClientSystemMessage,
+                new ClientSystemMessageSerializer()
+            );
+
+            types.RegisterMessageType<ClientSecretMessage>(
+                (int)DefaultMessageTypes.ClientSecret,
+                new ClientSecretMessageSerializer(),
+                new ClientSecretMessageHandler(client)
+            );
         }
 
         /// <summary>
@@ -99,8 +124,32 @@ namespace GameNet
         /// <param name="types">The message type config.</param>
         void RegisterDefaultServerMessageTypes(Server server, MessageTypeConfig types)
         {
-            types.RegisterMessageType<ServerUdpPortMessage>(ServerUdpPortMessage.TypeId, ServerUdpPortMessage.TypeForServer());
-            types.RegisterMessageType<ClientUdpPortMessage>(ClientUdpPortMessage.TypeId, ClientUdpPortMessage.TypeForServer(server));
+            types.RegisterMessageType<UdpPortMessage<Server>>(
+                (int)DefaultMessageTypes.ServerUdpPort,
+                new UdpPortMessageSerializer<Server>()
+            );
+
+            types.RegisterMessageType<UdpPortMessage<Client>>(
+                (int)DefaultMessageTypes.ClientUdpPort,
+                new UdpPortMessageSerializer<Client>(),
+                new UdpPortMessageHandler<Client>(server)
+            );
+
+            types.RegisterMessageType<ClientSystemMessage>(
+                (int)DefaultMessageTypes.ClientSystemMessage,
+                new ClientSystemMessageSerializer(),
+                new ClientSystemMessageHandler(server)
+            );
+            
+            types.RegisterMessageType<ServerSystemMessage>(
+                (int)DefaultMessageTypes.ServerSystemMessage,
+                new ServerSystemMessageSerializer()
+            );
+
+            types.RegisterMessageType<ClientSecretMessage>(
+                (int)DefaultMessageTypes.ClientSecret,
+                new ClientSecretMessageSerializer()
+            );
         }
 
         /// <summary>
