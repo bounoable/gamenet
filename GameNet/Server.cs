@@ -29,15 +29,15 @@ namespace GameNet
             .Where(endpoint => endpoint != null);
 
         #region events
-        public event EventHandler<ClientConnectedEventArgs> ClientConnected = delegate {};
-        public event EventHandler<ClientDisconnectedEventArgs> ClientDisconnected = delegate {};
+        public event EventHandler<PlayerConnectedEventArgs> ClientConnected = delegate {};
+        public event EventHandler<PlayerDisconnectedEventArgs> ClientDisconnected = delegate {};
         public event EventHandler<UdpPortsExchangedEventArgs> UdpPortsExchanged = delegate {};
         #endregion
 
         TcpListener _listener;
         protected Messenger _messenger;
 
-        protected Dictionary<int, ClientContainer> _clients = new Dictionary<int, ClientContainer>();
+        protected Dictionary<int, Player> _clients = new Dictionary<int, Player>();
         int nextClientId = 0;
 
         bool AcceptsClients => Active;
@@ -97,13 +97,12 @@ namespace GameNet
         public void Start()
         {
             _listener = new TcpListener(IPAddress, Port);
-
             _listener.Start();
-            _messenger.Init();
 
             Active = true;
 
-            Task.Run(() => AcceptClients());
+            Task.Run(() => AcceptClients().ConfigureAwait(false));
+            Task.Run(() => _messenger.RequestPendingAcknowledgeResponses().ConfigureAwait(false));
         }
 
         /// <summary>
@@ -113,8 +112,9 @@ namespace GameNet
         {
             Active = false;
 
-            RemoveClients();
+            RemovePlayers();
 
+            _messenger.StopRequestPendingAcknowlegeResponses();
             _listener.Stop();
         }
 
@@ -126,19 +126,19 @@ namespace GameNet
             while (AcceptsClients) {
                 try {
                     TcpClient client = await _listener.AcceptTcpClientAsync();
-                    ClientContainer container = new ClientContainer(client, DateTime.Now);
+                    Player player = new Player(client, DateTime.Now);
 
-                    _clients[nextClientId] = container;
+                    _clients[nextClientId] = player;
                     nextClientId++;
 
-                    Task.Run(() => ReceiveData(client));
+                    Task.Run(() => ReceiveData(client).ConfigureAwait(false));
 
                     Task.Run(async () => {
-                        await SendSecretTo(container);
-                        await SendUdpPortTo(container);
+                        await SendSecretTo(player);
+                        await SendUdpPortTo(player);
                     });
 
-                    ClientConnected(this, new ClientConnectedEventArgs(container));
+                    ClientConnected(this, new PlayerConnectedEventArgs(player));
                 } catch (ObjectDisposedException e) {}
             }
         }
@@ -152,30 +152,30 @@ namespace GameNet
         /// <summary>
         /// Remove the clients from the server.
         /// </summary>
-        public void RemoveClients()
+        public void RemovePlayers()
         {
             for (int i = 0; i < _clients.Count; i++) {
-                RemoveClient(_clients[i]);
+                RemovePlayer(_clients[i]);
             }
         }
 
         /// <summary>
         /// Remove a TCP client from the server.
         /// </summary>
-        /// <param name="client">The TCP client.</param>
-        public void RemoveClient(ClientContainer client)
+        /// <param name="player">The player.</param>
+        public void RemovePlayer(Player player)
         {
             try {
-                client.TcpClient.GetStream().Close();
-                client.TcpClient.Close();
+                player.TcpClient.GetStream().Close();
+                player.TcpClient.Close();
             } catch (Exception e) {
                 return;
             }
 
             int id = -1;
 
-            foreach (KeyValuePair<int, ClientContainer> entry in _clients) {
-                if (entry.Value != client)
+            foreach (KeyValuePair<int, Player> entry in _clients) {
+                if (entry.Value != player)
                     continue;
 
                 id = entry.Key;
@@ -186,17 +186,17 @@ namespace GameNet
                 _clients.Remove(id);
             }
 
-            ClientDisconnected(this, new ClientDisconnectedEventArgs(client));
+            ClientDisconnected(this, new PlayerDisconnectedEventArgs(player));
         }
 
         /// <summary>
         /// Find a client by it's secret.
         /// </summary>
         /// <param name="secret">The client secret.</param>
-        /// <returns>The client container.</returns>
-        public ClientContainer GetClientBySecret(string secret)
+        /// <returns>The player.</returns>
+        public Player GetPlayerBySecret(string secret)
         {
-            foreach (ClientContainer client in _clients.Values) {
+            foreach (Player client in _clients.Values) {
                 if (client.Secret == secret) {
                     return client;
                 }
@@ -205,16 +205,16 @@ namespace GameNet
             return null;
         }
 
-        async Task<byte[]> SendSecretTo(ClientContainer client)
+        async Task<byte[]> SendSecretTo(Player client)
             => await SendTo(client, new ClientSecretMessage(client.Secret));
         
         /// <summary>
         /// Send a UDP port message containing the server's local UDP port to a client.
         /// </summary>
-        /// <param name="client">The client container.</param>
+        /// <param name="player">The player.</param>
         /// <returns>The sent bytes.</returns>
-        async Task<byte[]> SendUdpPortTo(ClientContainer client)
-            => await SendTo(client, new UdpPortMessage<Server>(NetworkConfig.LocalUdpPort));
+        async Task<byte[]> SendUdpPortTo(Player player)
+            => await SendTo(player, new UdpPortMessage<Server>(NetworkConfig.LocalUdpPort));
 
         /// <summary>
         /// Register a client's local UDP port.
@@ -222,16 +222,16 @@ namespace GameNet
         /// <param name="message">The UDP port message.</param>
         public void RegisterClientUdpPort(IUdpPortMessage message)
         {
-            foreach (ClientContainer client in _clients.Values) {
-                if (client.Secret != message.Secret)
+            foreach (Player player in _clients.Values) {
+                if (player.Secret != message.Secret)
                     continue;
                 
-                client.UdpEndpoint = (IPEndPoint)client.TcpClient.Client.RemoteEndPoint;
-                client.UdpEndpoint.Port = message.Port;
+                player.UdpEndpoint = (IPEndPoint)player.TcpClient.Client.RemoteEndPoint;
+                player.UdpEndpoint.Port = message.Port;
 
-                Task.Run(() => ReceiveData(_udpClient, client.UdpEndpoint));
+                Task.Run(() => ReceiveData(_udpClient, player.UdpEndpoint).ConfigureAwait(false));
 
-                UdpPortsExchanged(this, new UdpPortsExchangedEventArgs(client));
+                UdpPortsExchanged(this, new UdpPortsExchangedEventArgs(player));
 
                 return;
             }
@@ -242,7 +242,7 @@ namespace GameNet
         /// </summary>
         /// <param name="clientSecret">The client's secret.</param>
         public void NotifyHeartbeat(string clientSecret)
-            => GetClientBySecret(clientSecret)?.UpdateHearbeat();
+            => GetPlayerBySecret(clientSecret)?.UpdateHearbeat();
 
         /// <summary>
         /// Send data to the clients.
@@ -268,10 +268,10 @@ namespace GameNet
         /// <summary>
         /// Send data to a specific client and return the sent bytes.
         /// </summary>
-        /// <param name="client">The recipient client container.</param>
+        /// <param name="client">The recipient player.</param>
         /// <param name="data">The data to send.</param>
         /// <returns>The sent bytes.</returns>
-        async public Task<byte[]> SendTo(ClientContainer client, byte[] data, ProtocolType protocol = ProtocolType.Tcp)
+        async public Task<byte[]> SendTo(Player client, byte[] data, ProtocolType protocol = ProtocolType.Tcp)
         {
             switch (protocol) {
                 case ProtocolType.Udp:
@@ -349,11 +349,11 @@ namespace GameNet
         /// <summary>
         /// Send a packet to a specific client and return the sent bytes.
         /// </summary>
-        /// <param name="client">The recipient client container.</param>
+        /// <param name="client">The recipient player.</param>
         /// <param name="packet">The packet to send.</param>
         /// <param name="protocol">The protocol to use.</param>
         /// <returns>The sent bytes.</returns>
-        async public Task<byte[]> SendTo(ClientContainer client, IPacket packet, ProtocolType protocol = ProtocolType.Tcp)
+        async public Task<byte[]> SendTo(Player client, IPacket packet, ProtocolType protocol = ProtocolType.Tcp)
         {
             switch (protocol) {
                 case ProtocolType.Udp:
@@ -377,11 +377,11 @@ namespace GameNet
         /// <summary>
         /// Send a packet to specific endpoints over the UDP client.
         /// </summary>
-        /// <param name="clients">The recipient client containers.</param>
+        /// <param name="clients">The recipient players.</param>
         /// <param name="packet">The packet to send.</param>
         /// <param name="protocol">The protocol to use.</param>
         /// <returns>The sent bytes.</returns>
-        async public Task SendTo(IEnumerable<ClientContainer> clients, IPacket packet, ProtocolType protocol = ProtocolType.Tcp)
+        async public Task SendTo(IEnumerable<Player> clients, IPacket packet, ProtocolType protocol = ProtocolType.Tcp)
         {
             switch (protocol) {
                 case ProtocolType.Udp:
@@ -450,11 +450,11 @@ namespace GameNet
         /// Send an object to a specific client and return the sent bytes.
         /// The object will automatically be serialized to a message by the registered serializer.
         /// </summary>
-        /// <param name="client">The recipient client container.</param>
+        /// <param name="client">The recipient player.</param>
         /// <param name="object">The object to send.</param>
         /// <param name="protocol">The protocol to use.</param>
         /// <returns>The sent bytes.</returns>
-        async public Task<byte[]> SendTo<T>(ClientContainer client, T obj, ProtocolType protocol = ProtocolType.Tcp)
+        async public Task<byte[]> SendTo<T>(Player client, T obj, ProtocolType protocol = ProtocolType.Tcp)
         {
             switch (protocol) {
                 case ProtocolType.Udp:
@@ -490,11 +490,11 @@ namespace GameNet
         /// Send an object to specific clients.
         /// The object will automatically be serialized to a message by the registered serializer.
         /// </summary>
-        /// <param name="clients">The recipient client containers.</param>
+        /// <param name="clients">The recipient players.</param>
         /// <param name="object">The object to send.</param>
         /// <param name="protocol">The protocol to use.</param>
         /// <returns>The sent bytes.</returns>
-        async public Task SendTo<T>(IEnumerable<ClientContainer> clients, T obj, ProtocolType protocol = ProtocolType.Tcp)
+        async public Task SendTo<T>(IEnumerable<Player> clients, T obj, ProtocolType protocol = ProtocolType.Tcp)
         {
             switch (protocol) {
                 case ProtocolType.Udp:

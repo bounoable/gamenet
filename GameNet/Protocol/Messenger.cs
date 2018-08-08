@@ -7,45 +7,28 @@ using GameNet.Messages;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 
 namespace GameNet.Protocol
 {
     public class Messenger: IDataHandler
     {
-        public bool Initialized { get; private set; } = false;
+        bool ShouldRequestPendingAckResponses { get; set; }
 
-        readonly MessengerConfig _config;
         readonly MessageTypeConfig _typeConfig;
-        readonly HashSet<PendingAcknowledgeMessage> _pendingAcknowledgeMessages = new HashSet<PendingAcknowledgeMessage>();
+        readonly ConcurrentDictionary<string, PendingAcknowledgeRequest> _pendingAcknowledgeRequests = new ConcurrentDictionary<string, PendingAcknowledgeRequest>();
 
         /// <summary>
         /// Initialize a messenger.
         /// </summary>
-        /// <param name="config">The messenger config.</param>
         /// <param name="typeConfig">The message type config.</param>
-        public Messenger(MessengerConfig config, MessageTypeConfig typeConfig)
+        public Messenger(MessageTypeConfig typeConfig)
         {
-            if (config == null) {
-                throw new ArgumentNullException("config");
-            }
-
             if (typeConfig == null) {
                 throw new ArgumentNullException("typeConfig");
             }
 
-            _config = config;
             _typeConfig = typeConfig;
-        }
-
-        /// <summary>
-        /// Initialize the messenger.
-        ///     - Periodically request pending acknowledge responses.
-        /// </summary>
-        public void Init()
-        {
-            Task.Run(() => RequestPendingAcknowledgeResponses()).ConfigureAwait(false);
-
-            Initialized = true;
         }
 
         /// <summary>
@@ -55,8 +38,6 @@ namespace GameNet.Protocol
         /// <param name="recipient">The sender of the data.</param>
         public void Handle(byte[] data, IRecipient sender)
         {
-            Console.WriteLine("Paket angekommen");
-
             // Check if the data contains at least the message type id.
             if (data.Length < sizeof(int))
                 return;
@@ -64,25 +45,21 @@ namespace GameNet.Protocol
             IPacket packet = ParsePacket(data);
             IMessageType type = _typeConfig.GetTypeById(packet.MessageTypeId);
 
-            Console.WriteLine(type);
-
             if (type == null || type.Serializer == null)
                 return;
 
             object obj = type.Serializer.Deserialize(data.Skip(sizeof(int)).ToArray());
 
-            if (obj is IAcknowledgeMessage) {
-                var message = (IAcknowledgeMessage)obj;
+            if (obj is IAcknowledgeRequest) {
+                var message = (IAcknowledgeRequest)obj;
 
                 Send(sender, new AcknowledgeResponse(message.AckToken));
-
-                // TODO: AcknowledgeResponse testen...
             }
 
-            if (obj is AcknowledgeResponse) {
-                var response = (AcknowledgeResponse)obj;
+            if (obj is IAcknowledgeResponse) {
+                var response = (IAcknowledgeResponse)obj;
 
-                _pendingAcknowledgeMessages.RemoveWhere(pending => pending.Message.AckToken == response.AckToken);
+                _pendingAcknowledgeRequests.TryRemove(response.AckToken, out PendingAcknowledgeRequest removed);
             }
 
             type.Handler?.Handle(obj);
@@ -170,15 +147,17 @@ namespace GameNet.Protocol
         async public Task<byte[]> Send<T>(IRecipient recipient, T obj)
         {
             if (obj is IEnumerable<byte>) {
-                return await SendBytes(recipient, (byte[])(IEnumerable<byte>)obj);
+                return await SendBytes(recipient, ((IEnumerable<byte>)obj).ToArray());
             }
 
             if (obj is IPacket) {
                 return await SendPacket(recipient, (IPacket)obj);
             }
 
-            if (obj is IAcknowledgeMessage) {
-                _pendingAcknowledgeMessages.Add(new PendingAcknowledgeMessage((IAcknowledgeMessage)obj, recipient));
+            if (obj is IAcknowledgeRequest) {
+                var request = (IAcknowledgeRequest)obj;
+
+                _pendingAcknowledgeRequests.TryAdd(request.AckToken, new PendingAcknowledgeRequest(request, recipient));
             }
 
             IPacket packet = CreatePacketFromObject(obj);
@@ -259,28 +238,47 @@ namespace GameNet.Protocol
         /// Request acknowledge responses for the acknowledge
         /// messages that have not been responded to yet.
         /// </summary>
-        /// <returns></returns>
-        async Task RequestPendingAcknowledgeResponses()
+        async public Task RequestPendingAcknowledgeResponses()
         {
-            while (Initialized) {
-                await Task.Delay(_config.AcknowledgeMessageInterval);
+            ShouldRequestPendingAckResponses = true;
 
-                PendingAcknowledgeMessage removePending = null;
+            while (ShouldRequestPendingAckResponses) {
+                await Task.Delay(100);
+
+                if (_pendingAcknowledgeRequests.Count == 0)
+                    continue;
                 
-                foreach (PendingAcknowledgeMessage pending in _pendingAcknowledgeMessages) {
+                var removePending = new HashSet<PendingAcknowledgeRequest>();
+
+                DateTime now = DateTime.Now;
+                
+                foreach (PendingAcknowledgeRequest pending in _pendingAcknowledgeRequests.Values) {
+                    if (pending.LastTry.AddMilliseconds(pending.Message.Timeout) >= now)
+                        continue;
+                    
                     Send(pending.Recipient, pending.Message);
                     
                     pending.Tries++;
+                    pending.LastTry = now;
 
-                    if (pending.Tries >= _config.AcknowledgeMessageRetries) {
-                        removePending = pending;
+                    if (pending.Tries >= pending.Message.Retries) {
+                        removePending.Add(pending);
                     }
                 }
 
-                if (removePending != null) {
-                    _pendingAcknowledgeMessages.Remove(removePending);
+                if (removePending.Count > 0) {
+                    foreach (PendingAcknowledgeRequest remove in removePending) {
+                        _pendingAcknowledgeRequests.TryRemove(remove.Message.AckToken, out PendingAcknowledgeRequest removed);
+                    }
                 }
             }
         }
+
+
+        /// <summary>
+        /// Stop the resending of pending acknowledge messages.
+        /// </summary>
+        public void StopRequestPendingAcknowlegeResponses()
+            => ShouldRequestPendingAckResponses = false;
     }
 }

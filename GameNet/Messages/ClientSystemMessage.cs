@@ -14,7 +14,7 @@ namespace GameNet.Messages
             Secret = secret;
         }
 
-        public ClientSystemMessage(MessageType type, byte[] ackToken, string secret): base(type, ackToken)
+        public ClientSystemMessage(MessageType type, string ackToken, string secret): base(type, ackToken)
         {
             Secret = secret;
         }

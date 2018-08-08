@@ -1,10 +1,10 @@
 namespace GameNet.Messages
 {
-    public class AcknowledgeResponse
+    public class AcknowledgeResponse: IAcknowledgeResponse
     {
-        public byte[] AckToken { get; }
+        public string AckToken { get; }
 
-        public AcknowledgeResponse(byte[] token)
+        public AcknowledgeResponse(string token)
         {
             AckToken = token;
         }

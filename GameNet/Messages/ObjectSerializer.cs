@@ -3,7 +3,7 @@ using GameNet.Support;
 
 namespace GameNet.Messages
 {
-    abstract public class ObjectSerializer<T>: IObjectSerializer
+    abstract public class ObjectSerializer<T>: IObjectSerializer where T: class
     {
         /// <summary>
         /// Serialize an object into a byte array.

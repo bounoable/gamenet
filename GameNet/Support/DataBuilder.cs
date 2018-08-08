@@ -142,9 +142,11 @@ namespace GameNet.Support
         /// <returns>The data builder.</returns>
         public DataBuilder String(string value)
         {   
-            Int(value.Length);
+            int length = value == null ? 0 : value.Length;
 
-            return value.Length > 0 ? Append(Encoding.Unicode.GetBytes(value)) : this;
+            Int(length);
+
+            return length > 0 ? Append(Encoding.Unicode.GetBytes(value)) : this;
         }
 
         /// <summary>

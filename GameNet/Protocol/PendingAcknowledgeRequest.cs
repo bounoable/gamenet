@@ -3,13 +3,14 @@ using GameNet.Messages;
 
 namespace GameNet.Protocol
 {
-    public class PendingAcknowledgeMessage
+    public class PendingAcknowledgeRequest
     {
-        public IAcknowledgeMessage Message { get; }
+        public IAcknowledgeRequest Message { get; }
         public IRecipient Recipient { get; }
         public int Tries { get; set; } = 0;
+        public DateTime LastTry { get; set; }
 
-        public PendingAcknowledgeMessage(IAcknowledgeMessage message, IRecipient recipient)
+        public PendingAcknowledgeRequest(IAcknowledgeRequest message, IRecipient recipient)
         {
             if (message == null) {
                 throw new ArgumentNullException("message");

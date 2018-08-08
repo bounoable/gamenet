@@ -2,7 +2,7 @@ using System;
 
 namespace GameNet.Messages
 {
-    public class SystemMessage<T>: AcknowledgeMessage where T: Enum
+    public class SystemMessage<T>: AcknowledgeRequest where T: Enum
     {
         public T Type { get; }
 
@@ -11,7 +11,7 @@ namespace GameNet.Messages
             Type = type;
         }
 
-        public SystemMessage(T type, byte[] ackToken): base(ackToken)
+        public SystemMessage(T type, string ackToken): base(ackToken)
         {
             Type = type;
         }

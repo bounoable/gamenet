@@ -11,8 +11,6 @@ namespace GameNet
 {
     public class GameNetFactory
     {
-        public MessengerConfig MessengerConfig { get; } = new MessengerConfig();
-
         readonly Dictionary<Type, IMessageType> _messageTypes = new Dictionary<Type, IMessageType>();
 
         /// <summary>
@@ -39,7 +37,7 @@ namespace GameNet
         public Client CreateClient(ushort udpPort = NetworkConfiguration.DEFAULT_UDP_PORT)
         {
             var types = new MessageTypeConfig();
-            var messenger = new Messenger(MessengerConfig, types);
+            var messenger = new Messenger(types);
             var client = new Client(new ClientConfiguration(udpPort), messenger);
 
             RegisterDefaultClientMessageTypes(client, types);
@@ -60,7 +58,7 @@ namespace GameNet
         public Server CreateServer(IPAddress ipAddress, ushort tcpPort = ServerConfiguration.DEFAULT_PORT, ushort udpPort = NetworkConfiguration.DEFAULT_UDP_PORT)
         {
             var types = new MessageTypeConfig();
-            var messenger = new Messenger(MessengerConfig, types);
+            var messenger = new Messenger(types);
             var server = new Server(new ServerConfiguration(ipAddress, tcpPort, udpPort), messenger);
 
             RegisterDefaultServerMessageTypes(server, types);
@@ -88,6 +86,11 @@ namespace GameNet
         /// <param name="types">The message type config.</param>
         void RegisterDefaultClientMessageTypes(Client client, MessageTypeConfig types)
         {
+            types.RegisterMessageType<AcknowledgeResponse>(
+                (int)DefaultMessageTypes.AcknowledgeResponse,
+                new AcknowledgeResponseSerializer()
+            );
+
             types.RegisterMessageType<UdpPortMessage<Client>>(
                 (int)DefaultMessageTypes.ClientUdpPort,
                 new UdpPortMessageSerializer<Client>()
@@ -124,6 +127,11 @@ namespace GameNet
         /// <param name="types">The message type config.</param>
         void RegisterDefaultServerMessageTypes(Server server, MessageTypeConfig types)
         {
+            types.RegisterMessageType<AcknowledgeResponse>(
+                (int)DefaultMessageTypes.AcknowledgeResponse,
+                new AcknowledgeResponseSerializer()
+            );
+
             types.RegisterMessageType<UdpPortMessage<Server>>(
                 (int)DefaultMessageTypes.ServerUdpPort,
                 new UdpPortMessageSerializer<Server>()

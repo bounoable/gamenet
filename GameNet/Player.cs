@@ -6,10 +6,10 @@ using System.Net.Sockets;
 
 namespace GameNet
 {
-    public class ClientContainer
+    public class Player
     {
-        static Random _rand = new Random();
-        static Base62Converter _tokenGenerator = new Base62Converter();
+        readonly static Random _rand = new Random();
+        readonly static Base62Converter _tokenGenerator = new Base62Converter();
 
         public string Secret { get; }
         public DateTime JoinedAt { get; }
@@ -40,13 +40,13 @@ namespace GameNet
         TcpClient _tcpClient;
         IPEndPoint _udpEndpoint;
 
-        public ClientContainer(DateTime joinedAt)
+        public Player(DateTime joinedAt)
         {
             JoinedAt = joinedAt;
             LastHeartbeat = JoinedAt;
         }
 
-        public ClientContainer(TcpClient tcpClient, IPEndPoint udpEndpoint, DateTime joinedAt)
+        public Player(TcpClient tcpClient, IPEndPoint udpEndpoint, DateTime joinedAt)
         {
             JoinedAt = joinedAt;
             LastHeartbeat = JoinedAt;
@@ -56,12 +56,12 @@ namespace GameNet
             byte[] buffer = new byte[8];
             _rand.NextBytes(buffer);
 
-            string hex = BitConverter.ToString(buffer).Replace("-", string.Empty);
-
-            Secret = _tokenGenerator.Encode(hex);
+            Secret = _tokenGenerator.Encode(
+                BitConverter.ToString(buffer).Replace("-", string.Empty)
+            );
         }
 
-        public ClientContainer(TcpClient tcpClient, DateTime joinedAt)
+        public Player(TcpClient tcpClient, DateTime joinedAt)
         {
             JoinedAt = joinedAt;
             LastHeartbeat = JoinedAt;

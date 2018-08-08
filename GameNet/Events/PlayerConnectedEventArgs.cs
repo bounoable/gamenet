@@ -3,12 +3,12 @@ using System.Net.Sockets;
 
 namespace GameNet.Events
 {
-    public class ClientConnectedEventArgs: EventArgs
+    public class PlayerConnectedEventArgs: EventArgs
     {
-        public ClientContainer Client { get; }
+        public Player Client { get; }
         public DateTime ConnectedAt { get; } = DateTime.Now;
 
-        public ClientConnectedEventArgs(ClientContainer client)
+        public PlayerConnectedEventArgs(Player client)
         {
             Client = client;
         }

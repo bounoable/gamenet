@@ -66,11 +66,11 @@ namespace GameNet
             ValidatePort(port);
 
             _tcpServer.Connect(ipAddress, port);
-            _messenger.Init();
 
             Connected = true;
 
-            Task.Run(() => ReceiveData(_tcpServer));
+            Task.Run(() => ReceiveData(_tcpServer).ConfigureAwait(false));
+            Task.Run(() => _messenger.RequestPendingAcknowledgeResponses().ConfigureAwait(false));
         }
 
         /// <summary>
@@ -89,6 +89,7 @@ namespace GameNet
                 return;
             }
 
+            _messenger.StopRequestPendingAcknowlegeResponses();
             _tcpServer.Close();
             _tcpServer = null;
             _udpClient.Close();
@@ -143,8 +144,8 @@ namespace GameNet
             ServerUdpEndpoint = (IPEndPoint)_tcpServer.Client.RemoteEndPoint;
             ServerUdpEndpoint.Port = message.Port;
 
-            Task.Run(() => ReceiveData(_udpClient, ServerUdpEndpoint));
-            Task.Run(() => SendUdpPortToServer());
+            Task.Run(() => ReceiveData(_udpClient, ServerUdpEndpoint).ConfigureAwait(false));
+            Task.Run(() => SendUdpPortToServer().ConfigureAwait(false));
         }
 
         /// <summary>

@@ -8,7 +8,7 @@ namespace GameNet.Messages
         public ServerSystemMessage(MessageType type): base(type)
         {}
 
-        public ServerSystemMessage(MessageType type, byte[] ackToken): base(type, ackToken)
+        public ServerSystemMessage(MessageType type, string ackToken): base(type, ackToken)
         {}
     }
 }
