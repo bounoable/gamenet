@@ -121,7 +121,7 @@ namespace GameNet
         /// <summary>
         /// Periodically send a heartbeat message to the server.
         /// </summary>
-        async public Task BeginHeartbeatMessages()
+        async public Task SendHeartbeatMessages()
         {
             while (Connected && !string.IsNullOrEmpty(Secret)) {
                 await SendHeartbeatMessage();

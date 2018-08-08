@@ -14,7 +14,7 @@ namespace GameNet.Messages.Handlers
         override protected void HandleMessage(ClientSecretMessage message)
         {
             _client.Secret = message.Secret;
-            Task.Run(() => _client.BeginHeartbeatMessages());
+            Task.Run(() => _client.SendHeartbeatMessages());
         }
     }
 }

@@ -29,8 +29,8 @@ namespace GameNet
             .Where(endpoint => endpoint != null);
 
         #region events
-        public event EventHandler<PlayerConnectedEventArgs> ClientConnected = delegate {};
-        public event EventHandler<PlayerDisconnectedEventArgs> ClientDisconnected = delegate {};
+        public event EventHandler<PlayerConnectedEventArgs> PlayerConnected = delegate {};
+        public event EventHandler<PlayerDisconnectedEventArgs> PlayerDisconnected = delegate {};
         public event EventHandler<UdpPortsExchangedEventArgs> UdpPortsExchanged = delegate {};
         #endregion
 
@@ -139,7 +139,7 @@ namespace GameNet
                         await SendUdpPortTo(player);
                     });
 
-                    ClientConnected(this, new PlayerConnectedEventArgs(player));
+                    PlayerConnected(this, new PlayerConnectedEventArgs(player));
                 } catch (ObjectDisposedException e) {}
             }
         }
@@ -186,8 +186,6 @@ namespace GameNet
             if (id > -1) {
                 _players.Remove(id);
             }
-
-            ClientDisconnected(this, new PlayerDisconnectedEventArgs(player));
         }
 
         /// <summary>
@@ -209,6 +207,9 @@ namespace GameNet
 
                 foreach (Player player in removePlayers) {
                     RemovePlayer(player);
+                    PlayerDisconnected(this, new PlayerDisconnectedEventArgs(player));
+
+                    Console.WriteLine($"Player disconnected: {player.Secret}");
                 }
             }
         }
