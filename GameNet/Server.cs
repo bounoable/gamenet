@@ -21,10 +21,10 @@ namespace GameNet
 
         override protected bool ShouldReceiveData => Active;
 
-        public IEnumerable<TcpClient> TcpClients => _clients.Values
+        public IEnumerable<TcpClient> TcpClients => _players.Values
             .Select(container => container.TcpClient);
 
-        public IEnumerable<IPEndPoint> UdpEndpoints => _clients.Values
+        public IEnumerable<IPEndPoint> UdpEndpoints => _players.Values
             .Select(container => container.UdpEndpoint)
             .Where(endpoint => endpoint != null);
 
@@ -37,7 +37,7 @@ namespace GameNet
         TcpListener _listener;
         protected Messenger _messenger;
 
-        protected Dictionary<int, Player> _clients = new Dictionary<int, Player>();
+        protected Dictionary<int, Player> _players = new Dictionary<int, Player>();
         int nextClientId = 0;
 
         bool AcceptsClients => Active;
@@ -102,6 +102,7 @@ namespace GameNet
             Active = true;
 
             Task.Run(() => AcceptClients().ConfigureAwait(false));
+            Task.Run(() => KickDisconnectedPlayers().ConfigureAwait(false));
             Task.Run(() => _messenger.RequestPendingAcknowledgeResponses().ConfigureAwait(false));
         }
 
@@ -128,7 +129,7 @@ namespace GameNet
                     TcpClient client = await _listener.AcceptTcpClientAsync();
                     Player player = new Player(client, DateTime.Now);
 
-                    _clients[nextClientId] = player;
+                    _players[nextClientId] = player;
                     nextClientId++;
 
                     Task.Run(() => ReceiveData(client).ConfigureAwait(false));
@@ -154,8 +155,8 @@ namespace GameNet
         /// </summary>
         public void RemovePlayers()
         {
-            for (int i = 0; i < _clients.Count; i++) {
-                RemovePlayer(_clients[i]);
+            for (int i = 0; i < _players.Count; i++) {
+                RemovePlayer(_players[i]);
             }
         }
 
@@ -174,7 +175,7 @@ namespace GameNet
 
             int id = -1;
 
-            foreach (KeyValuePair<int, Player> entry in _clients) {
+            foreach (KeyValuePair<int, Player> entry in _players) {
                 if (entry.Value != player)
                     continue;
 
@@ -183,10 +184,33 @@ namespace GameNet
             }
 
             if (id > -1) {
-                _clients.Remove(id);
+                _players.Remove(id);
             }
 
             ClientDisconnected(this, new PlayerDisconnectedEventArgs(player));
+        }
+
+        /// <summary>
+        /// Begin the kicking of non-responding players.
+        /// </summary>
+        async public Task KickDisconnectedPlayers()
+        {
+            while (Active) {
+                await Task.Delay(5000);
+
+                DateTime now = DateTime.Now;
+                var removePlayers = new HashSet<Player>();
+
+                foreach (Player player in _players.Values) {
+                    if (player.LastHeartbeat.AddMilliseconds(Config.HeartbeatTimeout) < now) {
+                        removePlayers.Add(player);
+                    }
+                }
+
+                foreach (Player player in removePlayers) {
+                    RemovePlayer(player);
+                }
+            }
         }
 
         /// <summary>
@@ -196,7 +220,7 @@ namespace GameNet
         /// <returns>The player.</returns>
         public Player GetPlayerBySecret(string secret)
         {
-            foreach (Player client in _clients.Values) {
+            foreach (Player client in _players.Values) {
                 if (client.Secret == secret) {
                     return client;
                 }
@@ -222,7 +246,7 @@ namespace GameNet
         /// <param name="message">The UDP port message.</param>
         public void RegisterClientUdpPort(IUdpPortMessage message)
         {
-            foreach (Player player in _clients.Values) {
+            foreach (Player player in _players.Values) {
                 if (player.Secret != message.Secret)
                     continue;
                 
