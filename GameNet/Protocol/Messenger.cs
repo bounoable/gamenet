@@ -75,6 +75,8 @@ namespace GameNet.Protocol
                 var message = (IAcknowledgeMessage)obj;
 
                 Send(sender, new AcknowledgeResponse(message.AckToken));
+
+                // TODO: AcknowledgeResponse testen...
             }
 
             if (obj is AcknowledgeResponse) {
