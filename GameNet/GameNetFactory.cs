@@ -11,7 +11,11 @@ namespace GameNet
 {
     public class GameNetFactory
     {
+        public static GameNetFactory Instance { get; } = new GameNetFactory();
+
         readonly Dictionary<Type, IMessageType> _messageTypes = new Dictionary<Type, IMessageType>();
+        readonly Dictionary<Type, IMessageType> _clientMessageTypes = new Dictionary<Type, IMessageType>();
+        readonly Dictionary<Type, IMessageType> _serverMessageTypes = new Dictionary<Type, IMessageType>();
 
         /// <summary>
         /// Register a message type for both the server and the client.
@@ -28,6 +32,38 @@ namespace GameNet
         /// <typeparam name="T">The object type of the message.</typeparam>
         public void RegisterMessageType<T>(IObjectSerializer serializer, IMessageHandler handler)
             => RegisterMessageType<T>(new MessageType<T>(serializer, handler));
+        
+        /// <summary>
+        /// Register a message type for the client.
+        /// </summary>
+        /// <param name="messageType">The message type.</param>
+        /// <typeparam name="T">The object type of the message.</typeparam>
+        public void RegisterClientMessageType<T>(IMessageType messageType)
+            => _clientMessageTypes[typeof(T)] = messageType;
+        
+        /// <summary>
+        /// Register a message type for the client.
+        /// </summary>
+        /// <param name="serializer">The message object serializer.</param>
+        /// <typeparam name="T">The object type of the message.</typeparam>
+        public void RegisterClientMessageType<T>(IObjectSerializer serializer, IMessageHandler handler)
+            => RegisterClientMessageType<T>(new MessageType<T>(serializer, handler));
+        
+        /// <summary>
+        /// Register a message type for the server.
+        /// </summary>
+        /// <param name="messageType">The message type.</param>
+        /// <typeparam name="T">The object type of the message.</typeparam>
+        public void RegisterServerMessageType<T>(IMessageType messageType)
+            => _serverMessageTypes[typeof(T)] = messageType;
+        
+        /// <summary>
+        /// Register a message type for the server.
+        /// </summary>
+        /// <param name="serializer">The message object serializer.</param>
+        /// <typeparam name="T">The object type of the message.</typeparam>
+        public void RegisterServerMessageType<T>(IObjectSerializer serializer, IMessageHandler handler)
+            => RegisterServerMessageType<T>(new MessageType<T>(serializer, handler));
 
         /// <summary>
         /// Create a game client.
@@ -42,6 +78,10 @@ namespace GameNet
 
             RegisterDefaultClientMessageTypes(client, types);
             RegisterUserMessageTypes(types);
+
+            foreach (KeyValuePair<Type, IMessageType> item in _clientMessageTypes) {
+                types.RegisterMessageType(item.Key, item.Value);
+            }
 
             client.RegisterDataHandler(messenger);
 
@@ -63,6 +103,10 @@ namespace GameNet
 
             RegisterDefaultServerMessageTypes(server, types);
             RegisterUserMessageTypes(types);
+
+            foreach (KeyValuePair<Type, IMessageType> item in _serverMessageTypes) {
+                types.RegisterMessageType(item.Key, item.Value);
+            }
 
             server.RegisterDataHandler(messenger);
 
@@ -166,8 +210,8 @@ namespace GameNet
         /// <param name="types">The message type config.</param>
         void RegisterUserMessageTypes(MessageTypeConfig types)
         {
-            foreach (KeyValuePair<Type, IMessageType> entry in _messageTypes) {
-                types.RegisterMessageType(entry.Key, entry.Value);
+            foreach (KeyValuePair<Type, IMessageType> item in _messageTypes) {
+                types.RegisterMessageType(item.Key, item.Value);
             }
         }
     }

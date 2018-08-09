@@ -26,15 +26,15 @@ namespace GameNet
         /// </summary>
         public string Secret { get; set; }
 
-        protected IPEndPoint ServerUdpEndpoint { get; private set; }
+        public Messenger Messenger { get; }
 
         /// <summary>
         /// Indicates if the client should receive data from the server.
         /// </summary>
         override protected bool ShouldReceiveData => Connected;
 
-        protected Messenger _messenger;
-        protected TcpClient _tcpServer = new TcpClient();
+        TcpClient _tcpServer = new TcpClient();
+        IPEndPoint _serverUdpEndpoint;
 
         /// <summary>
         /// Initialize the client for a client-server-connection.
@@ -48,7 +48,7 @@ namespace GameNet
             }
 
             Config = config;
-            _messenger = messenger;
+            Messenger = messenger;
         }
 
         /// <summary>
@@ -70,7 +70,7 @@ namespace GameNet
             Connected = true;
 
             Task.Run(() => ReceiveData(_tcpServer).ConfigureAwait(false));
-            Task.Run(() => _messenger.RequestPendingAcknowledgeResponses().ConfigureAwait(false));
+            Task.Run(() => Messenger.RequestPendingAcknowledgeResponses().ConfigureAwait(false));
         }
 
         /// <summary>
@@ -89,7 +89,7 @@ namespace GameNet
                 return;
             }
 
-            _messenger.StopRequestPendingAcknowlegeResponses();
+            Messenger.StopRequestPendingAcknowlegeResponses();
             _tcpServer.Close();
             _tcpServer = null;
             _udpClient.Close();
@@ -141,10 +141,10 @@ namespace GameNet
         /// <param name="message">The UDP port message from the server.</param>
         public void RegisterServerUdpPort(IUdpPortMessage message)
         {
-            ServerUdpEndpoint = (IPEndPoint)_tcpServer.Client.RemoteEndPoint;
-            ServerUdpEndpoint.Port = message.Port;
+            _serverUdpEndpoint = (IPEndPoint)_tcpServer.Client.RemoteEndPoint;
+            _serverUdpEndpoint.Port = message.Port;
 
-            Task.Run(() => ReceiveData(_udpClient, ServerUdpEndpoint).ConfigureAwait(false));
+            Task.Run(() => ReceiveData(_udpClient, _serverUdpEndpoint).ConfigureAwait(false));
             Task.Run(() => SendUdpPortToServer().ConfigureAwait(false));
         }
 
@@ -165,14 +165,14 @@ namespace GameNet
         {
             switch (protocol) {
                 case ProtocolType.Udp:
-                    if (ServerUdpEndpoint == null)
+                    if (_serverUdpEndpoint == null)
                         return new byte[0];
 
-                    return await _messenger.SendBytes(_udpClient, ServerUdpEndpoint, data);
+                    return await Messenger.SendBytes(_udpClient, _serverUdpEndpoint, data);
 
                 case ProtocolType.Tcp:
                 default:
-                    return await _messenger.SendBytes(_tcpServer.GetStream(), data);
+                    return await Messenger.SendBytes(_tcpServer.GetStream(), data);
             }
         }
 
@@ -186,11 +186,11 @@ namespace GameNet
         {
             switch (protocol) {
                 case ProtocolType.Udp:
-                    return _messenger.SendPacket(_udpClient, ServerUdpEndpoint, packet);
+                    return Messenger.SendPacket(_udpClient, _serverUdpEndpoint, packet);
 
                 case ProtocolType.Tcp:
                 default:
-                    return _messenger.SendPacket(_tcpServer.GetStream(), packet);
+                    return Messenger.SendPacket(_tcpServer.GetStream(), packet);
             }
         }
 
@@ -206,11 +206,11 @@ namespace GameNet
         {
             switch (protocol) {
                 case ProtocolType.Udp:
-                    return _messenger.Send<T>(_udpClient, ServerUdpEndpoint, obj);
+                    return Messenger.Send<T>(_udpClient, _serverUdpEndpoint, obj);
 
                 case ProtocolType.Tcp:
                 default:
-                    return _messenger.Send<T>(_tcpServer.GetStream(), obj);
+                    return Messenger.Send<T>(_tcpServer.GetStream(), obj);
             }
         }
     }

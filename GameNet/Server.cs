@@ -18,6 +18,7 @@ namespace GameNet
         public IPAddress IPAddress => Config.IPAddress;
         public int Port => Config.Port;
         public bool Active { get; private set; }
+        public Messenger Messenger { get; }
 
         override protected bool ShouldReceiveData => Active;
 
@@ -35,7 +36,6 @@ namespace GameNet
         #endregion
 
         TcpListener _listener;
-        protected Messenger _messenger;
 
         protected Dictionary<int, Player> _players = new Dictionary<int, Player>();
         int nextClientId = 0;
@@ -53,7 +53,7 @@ namespace GameNet
             ValidatePort(config.Port);
 
             Config = config;
-            _messenger = messenger;
+            Messenger = messenger;
         }
 
         /// <summary>
@@ -103,7 +103,7 @@ namespace GameNet
 
             Task.Run(() => AcceptClients().ConfigureAwait(false));
             Task.Run(() => KickDisconnectedPlayers().ConfigureAwait(false));
-            Task.Run(() => _messenger.RequestPendingAcknowledgeResponses().ConfigureAwait(false));
+            Task.Run(() => Messenger.RequestPendingAcknowledgeResponses().ConfigureAwait(false));
         }
 
         /// <summary>
@@ -115,8 +115,11 @@ namespace GameNet
 
             RemovePlayers();
 
-            _messenger.StopRequestPendingAcknowlegeResponses();
-            _listener.Stop();
+            Messenger.StopRequestPendingAcknowlegeResponses();
+
+            if (_listener != null) {
+                _listener.Stop();
+            }
         }
 
         /// <summary>
@@ -208,8 +211,6 @@ namespace GameNet
                 foreach (Player player in removePlayers) {
                     RemovePlayer(player);
                     PlayerDisconnected(this, new PlayerDisconnectedEventArgs(player));
-
-                    Console.WriteLine($"Player disconnected: {player.Secret}");
                 }
             }
         }
@@ -279,13 +280,13 @@ namespace GameNet
             switch (protocol) {
                 case ProtocolType.Udp:
                     await Task.WhenAll(UdpEndpoints.Select(
-                        endpoint => _messenger.SendBytes(_udpClient, endpoint, data)
+                        endpoint => Messenger.SendBytes(_udpClient, endpoint, data)
                     )); break;
 
                 case ProtocolType.Tcp:
                 default:
                     await Task.WhenAll(TcpClients.Select(
-                        client => _messenger.SendBytes(client.GetStream(), data)
+                        client => Messenger.SendBytes(client.GetStream(), data)
                     )); break;
             }
         }
@@ -315,7 +316,7 @@ namespace GameNet
         /// <param name="data">The data to send.</param>
         /// <returns>The sent bytes.</returns>
         async public Task<byte[]> SendTo(TcpClient client, byte[] data)
-            => await _messenger.Send(client.GetStream(), data);
+            => await Messenger.Send(client.GetStream(), data);
         
         /// <summary>
         /// Send data to a specific endpoint over the UDP client and return the sent bytes.
@@ -324,7 +325,7 @@ namespace GameNet
         /// <param name="data">The data to send.</param>
         /// <returns>The sent bytes.</returns>
         async public Task<byte[]> SendTo(IPEndPoint recipient, byte[] data)
-            => await _messenger.Send(_udpClient, recipient, data);
+            => await Messenger.Send(_udpClient, recipient, data);
         
         /// <summary>
         /// Send data to specific clients.
@@ -334,7 +335,7 @@ namespace GameNet
         async public Task SendTo(IEnumerable<TcpClient> clients, byte[] data)
         {
             await Task.WhenAll(clients.Select(
-                client => _messenger.Send(client.GetStream(), data)
+                client => Messenger.Send(client.GetStream(), data)
             ));
         }
 
@@ -346,7 +347,7 @@ namespace GameNet
         async public Task SendTo(IEnumerable<IPEndPoint> recipients, byte[] data)
         {
             await Task.WhenAll(recipients.Select(
-                endpoint => _messenger.Send(_udpClient, endpoint, data)
+                endpoint => Messenger.Send(_udpClient, endpoint, data)
             ));
         }
 
@@ -360,13 +361,13 @@ namespace GameNet
             switch (protocol) {
                 case ProtocolType.Udp:
                     await Task.WhenAll(UdpEndpoints.Select(
-                        endpoint => _messenger.SendPacket(_udpClient, endpoint, packet)
+                        endpoint => Messenger.SendPacket(_udpClient, endpoint, packet)
                     )); break;
 
                 case ProtocolType.Tcp:
                 default:
                     await Task.WhenAll(TcpClients.Select(
-                        client => _messenger.SendPacket(client.GetStream(), packet)
+                        client => Messenger.SendPacket(client.GetStream(), packet)
                     )); break;
             }
         }
@@ -397,7 +398,7 @@ namespace GameNet
         /// <param name="packet">The packet to send.</param>
         /// <returns>The sent bytes.</returns>
         async public Task<byte[]> SendTo(TcpClient client, IPacket message)
-            => await _messenger.SendPacket(client.GetStream(), message);
+            => await Messenger.SendPacket(client.GetStream(), message);
         
         /// <summary>
         /// Send a packet to specific endpoints over the UDP client.
@@ -460,13 +461,13 @@ namespace GameNet
             switch (protocol) {
                 case ProtocolType.Udp:
                     await Task.WhenAll(UdpEndpoints.Select(
-                        endpoint => _messenger.Send(_udpClient, endpoint, obj)
+                        endpoint => Messenger.Send(_udpClient, endpoint, obj)
                     )); break;
 
                 case ProtocolType.Tcp:
                 default:
                     await Task.WhenAll(TcpClients.Select(
-                        client => _messenger.Send(client.GetStream(), obj)
+                        client => Messenger.Send(client.GetStream(), obj)
                     )); break;
             }
         }
@@ -499,7 +500,7 @@ namespace GameNet
         /// <param name="object">The object to send.</param>
         /// <returns>The sent bytes.</returns>
         async public Task<byte[]> SendTo<T>(TcpClient client, T obj)
-            => await _messenger.Send<T>(client.GetStream(), obj);
+            => await Messenger.Send<T>(client.GetStream(), obj);
         
         /// <summary>
         /// Send an object to a specific endpoint over the UDP client and return the sent bytes.
@@ -509,7 +510,7 @@ namespace GameNet
         /// <param name="object">The object to send.</param>
         /// <returns>The sent bytes.</returns>
         async public Task<byte[]> SendTo<T>(IPEndPoint recipient, T obj)
-            => await _messenger.Send<T>(_udpClient, recipient, obj);
+            => await Messenger.Send<T>(_udpClient, recipient, obj);
         
         /// <summary>
         /// Send an object to specific clients.
@@ -545,7 +546,7 @@ namespace GameNet
         async public Task SendTo<T>(IEnumerable<TcpClient> clients, T obj)
         {
             await Task.WhenAll(clients.Select(
-                client => _messenger.Send<T>(client.GetStream(), obj)
+                client => Messenger.Send<T>(client.GetStream(), obj)
             ));
         }
 
@@ -559,7 +560,7 @@ namespace GameNet
         async public Task SendTo<T>(IEnumerable<IPEndPoint> clients, T obj)
         {
             await Task.WhenAll(clients.Select(
-                endpoint => _messenger.Send<T>(_udpClient, endpoint, obj)
+                endpoint => Messenger.Send<T>(_udpClient, endpoint, obj)
             ));
         }
     }

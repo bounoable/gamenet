@@ -5,12 +5,12 @@ namespace GameNet.Events
 {
     public class PlayerConnectedEventArgs: EventArgs
     {
-        public Player Client { get; }
+        public Player Player { get; }
         public DateTime ConnectedAt { get; } = DateTime.Now;
 
-        public PlayerConnectedEventArgs(Player client)
+        public PlayerConnectedEventArgs(Player player)
         {
-            Client = client;
+            Player = player;
         }
     }
 }

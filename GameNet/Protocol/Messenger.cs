@@ -15,7 +15,8 @@ namespace GameNet.Protocol
     {
         bool ShouldRequestPendingAckResponses { get; set; }
 
-        readonly MessageTypeConfig _typeConfig;
+        public MessageTypeConfig TypeConfig { get; }
+
         readonly ConcurrentDictionary<string, PendingAcknowledgeRequest> _pendingAcknowledgeRequests = new ConcurrentDictionary<string, PendingAcknowledgeRequest>();
 
         /// <summary>
@@ -28,7 +29,7 @@ namespace GameNet.Protocol
                 throw new ArgumentNullException("typeConfig");
             }
 
-            _typeConfig = typeConfig;
+            TypeConfig = typeConfig;
         }
 
         /// <summary>
@@ -43,7 +44,7 @@ namespace GameNet.Protocol
                 return;
             
             IPacket packet = ParsePacket(data);
-            IMessageType type = _typeConfig.GetTypeById(packet.MessageTypeId);
+            IMessageType type = TypeConfig.GetTypeById(packet.MessageTypeId);
 
             if (type == null || type.Serializer == null)
                 return;
@@ -199,7 +200,7 @@ namespace GameNet.Protocol
         /// <returns>The created packet.</returns>
         IPacket CreatePacketFromObject<T>(T obj)
         {
-            IMessageType type = _typeConfig.GetType<T>();
+            IMessageType type = TypeConfig.GetType<T>();
 
             if (type == null || type.Serializer == null) {
                 return null;
@@ -211,7 +212,7 @@ namespace GameNet.Protocol
                 return null;
             }
 
-            int typeId = _typeConfig.GetTypeId(type);
+            int typeId = TypeConfig.GetTypeId(type);
 
             return new Packet(typeId, data);
         }
