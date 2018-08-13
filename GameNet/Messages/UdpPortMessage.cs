@@ -9,8 +9,9 @@ namespace GameNet.Messages
     {
         public ushort Port { get; }
         public string Secret { get; }
+        public string AckToken { get; }
 
-        public UdpPortMessage(ushort port)
+        public UdpPortMessage(ushort port): base()
         {
             Port = port;
         }

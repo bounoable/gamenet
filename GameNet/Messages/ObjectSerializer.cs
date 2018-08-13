@@ -24,7 +24,7 @@ namespace GameNet.Messages
         /// </summary>
         /// <param name="obj">The object to serialize.</param>
         /// <returns>The serialized byte array.</returns>
-        abstract public byte[] GetBytes(T obj);
+        abstract public byte[] GetBytes(T message);
 
         /// <summary>
         /// Deserialize bytes back into the object.

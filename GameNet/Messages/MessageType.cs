@@ -1,9 +1,19 @@
 using System;
+using Base62;
 
 namespace GameNet.Messages
 {
     public class MessageType<T>: IMessageType
     {
+        readonly static Base62Converter _idGenerator = new Base62Converter();
+
+        /// <summary>
+        /// The message type id.
+        /// </summary>
+        /// <value></value>
+        // public string Id { get; } = _idGenerator.Encode(typeof(T).ToString());
+        public string Id { get; } = typeof(T).ToString();
+
         /// <summary>
         /// The message handler.
         /// </summary>

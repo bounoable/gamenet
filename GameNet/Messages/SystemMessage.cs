@@ -2,18 +2,11 @@ using System;
 
 namespace GameNet.Messages
 {
-    public class SystemMessage<T>: AcknowledgeRequest where T: Enum
+    public class SystemMessage<T>: EnumAckMessage<T> where T: Enum
     {
-        public T Type { get; }
+        public T Type => Value;
 
-        public SystemMessage(T type): base()
-        {
-            Type = type;
-        }
-
-        public SystemMessage(T type, string ackToken): base(ackToken)
-        {
-            Type = type;
-        }
+        public SystemMessage(T type, string ackToken = null): base(type, ackToken)
+        {}
     }
 }

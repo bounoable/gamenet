@@ -7,18 +7,18 @@ namespace GameNet.Protocol
     public class Packet: IPacket
     {
         /// <summary>
-        /// The message type id.
+        /// The message type.
         /// </summary>
-        public int MessageTypeId { get; }
+        public string MessageType { get; }
 
         /// <summary>
         /// The payload.
         /// </summary>
         public byte[] Payload { get; }
 
-        public Packet(int typeId, byte[] payload)
+        public Packet(string type, byte[] payload)
         {
-            MessageTypeId = typeId;
+            MessageType = type;
             Payload = payload;
         }
     }

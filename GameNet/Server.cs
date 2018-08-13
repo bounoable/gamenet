@@ -103,7 +103,7 @@ namespace GameNet
 
             Task.Run(() => AcceptClients().ConfigureAwait(false));
             Task.Run(() => KickDisconnectedPlayers().ConfigureAwait(false));
-            Task.Run(() => Messenger.RequestPendingAcknowledgeResponses().ConfigureAwait(false));
+            Task.Run(() => Messenger.Start());
         }
 
         /// <summary>
@@ -115,7 +115,7 @@ namespace GameNet
 
             RemovePlayers();
 
-            Messenger.StopRequestPendingAcknowlegeResponses();
+            Messenger.Stop();
 
             if (_listener != null) {
                 _listener.Stop();
@@ -154,6 +154,22 @@ namespace GameNet
         public bool ContainsClient(TcpClient client) => TcpClients.Contains(client);
 
         /// <summary>
+        /// Get the player that is associated to a TCP client.
+        /// </summary>
+        /// <param name="client">The TCP client.</param>
+        /// <returns>The player.</returns>
+        public Player GetPlayerByTcpClient(TcpClient client)
+        {
+            foreach (Player player in _players.Values) {
+                if (player.TcpClient == client) {
+                    return player;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Remove the clients from the server.
         /// </summary>
         public void RemovePlayers()
@@ -170,8 +186,8 @@ namespace GameNet
         public void RemovePlayer(Player player)
         {
             try {
-                player.TcpClient.GetStream().Close();
-                player.TcpClient.Close();
+                player?.TcpClient?.GetStream()?.Close();
+                player?.TcpClient?.Close();
             } catch (Exception e) {
                 return;
             }
@@ -231,8 +247,8 @@ namespace GameNet
             return null;
         }
 
-        async Task<byte[]> SendSecretTo(Player client)
-            => await SendTo(client, new ClientSecretMessage(client.Secret));
+        async Task<byte[]> SendSecretTo(Player player)
+            => await SendTo(player, new ClientSecretMessage(player.Secret));
         
         /// <summary>
         /// Send a UDP port message containing the server's local UDP port to a client.
@@ -246,7 +262,7 @@ namespace GameNet
         /// Register a client's local UDP port.
         /// </summary>
         /// <param name="message">The UDP port message.</param>
-        public void RegisterClientUdpPort(IUdpPortMessage message)
+        public void HandleUdpPortMessage(UdpPortMessage<Client> message)
         {
             foreach (Player player in _players.Values) {
                 if (player.Secret != message.Secret)
@@ -264,11 +280,25 @@ namespace GameNet
         }
 
         /// <summary>
-        /// Notify the server about a received heartbeat from a client.
+        /// Notify the server about a received heartbeat from a player.
         /// </summary>
-        /// <param name="clientSecret">The client's secret.</param>
-        public void NotifyHeartbeat(string clientSecret)
-            => GetPlayerBySecret(clientSecret)?.UpdateHearbeat();
+        /// <param name="playerSecret">The player's secret.</param>
+        public void NotifyHeartbeat(string playerSecret)
+            => GetPlayerBySecret(playerSecret)?.UpdateHearbeat();
+
+        /// <summary>
+        /// Notify the server about a disconnected player.
+        /// </summary>
+        /// <param name="message">The disconnect message.</param>
+        public void HandleDisconnectMessage(DisconnectMessage message)
+        {
+            Player player = GetPlayerBySecret(message.Secret);
+
+            if (player != null) {
+                RemovePlayer(player);
+                PlayerDisconnected(this, new PlayerDisconnectedEventArgs(player));
+            }
+        }
 
         /// <summary>
         /// Send data to the clients.

@@ -26,24 +26,18 @@ namespace GameNet.Messages
         /// Create an acknowledge message.
         /// </summary>
         /// <param name="timeout">The response timeout.</param>
-        public AcknowledgeRequest()
+        public AcknowledgeRequest(string token = null)
         {
-            byte[] buffer = new byte[2];
-            _rand.NextBytes(buffer);
+            if (token != null) {
+                AckToken = token;
+            } else {
+                byte[] buffer = new byte[2];
+                _rand.NextBytes(buffer);
 
-            AckToken = _tokenGenerator.Encode(
-                BitConverter.ToString(buffer).Replace("-", string.Empty)
-            );
-        }
-
-        /// <summary>
-        /// Create an acknowledge message.
-        /// </summary>
-        /// <param name="token">The acknowledge token.</param>
-        /// <param name="timeout">The response timeout.</param>
-        public AcknowledgeRequest(string token)
-        {
-            AckToken = token;
+                AckToken = _tokenGenerator.Encode(
+                    BitConverter.ToString(buffer).Replace("-", string.Empty)
+                );
+            }
         }
     }
 }

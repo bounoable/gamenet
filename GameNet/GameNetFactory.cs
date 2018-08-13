@@ -131,36 +131,34 @@ namespace GameNet
         void RegisterDefaultClientMessageTypes(Client client, MessageTypeConfig types)
         {
             types.RegisterMessageType<AcknowledgeResponse>(
-                (int)DefaultMessageTypes.AcknowledgeResponse,
                 new AcknowledgeResponseSerializer()
             );
 
             types.RegisterMessageType<UdpPortMessage<Client>>(
-                (int)DefaultMessageTypes.ClientUdpPort,
                 new UdpPortMessageSerializer<Client>()
             );
 
             types.RegisterMessageType<UdpPortMessage<Server>>(
-                (int)DefaultMessageTypes.ServerUdpPort,
                 new UdpPortMessageSerializer<Server>(),
-                new UdpPortMessageHandler<Server>(client)
+                new MessageActionHandler<UdpPortMessage<Server>>(client.HandleUdpPortMessage)
             );
 
             types.RegisterMessageType<ServerSystemMessage>(
-                (int)DefaultMessageTypes.ServerSystemMessage,
                 new ServerSystemMessageSerializer(),
                 new ServerSystemMessageHandler(client)
             );
 
             types.RegisterMessageType<ClientSystemMessage>(
-                (int)DefaultMessageTypes.ClientSystemMessage,
                 new ClientSystemMessageSerializer()
             );
 
             types.RegisterMessageType<ClientSecretMessage>(
-                (int)DefaultMessageTypes.ClientSecret,
                 new ClientSecretMessageSerializer(),
-                new ClientSecretMessageHandler(client)
+                new MessageActionHandler<ClientSecretMessage>(client.HandleSecretMessage)
+            );
+
+            types.RegisterMessageType<DisconnectMessage>(
+                new DisconnectMessageSerializer()
             );
         }
 
@@ -172,35 +170,34 @@ namespace GameNet
         void RegisterDefaultServerMessageTypes(Server server, MessageTypeConfig types)
         {
             types.RegisterMessageType<AcknowledgeResponse>(
-                (int)DefaultMessageTypes.AcknowledgeResponse,
                 new AcknowledgeResponseSerializer()
             );
 
             types.RegisterMessageType<UdpPortMessage<Server>>(
-                (int)DefaultMessageTypes.ServerUdpPort,
                 new UdpPortMessageSerializer<Server>()
             );
 
             types.RegisterMessageType<UdpPortMessage<Client>>(
-                (int)DefaultMessageTypes.ClientUdpPort,
                 new UdpPortMessageSerializer<Client>(),
-                new UdpPortMessageHandler<Client>(server)
+                new MessageActionHandler<UdpPortMessage<Client>>(server.HandleUdpPortMessage)
             );
 
             types.RegisterMessageType<ClientSystemMessage>(
-                (int)DefaultMessageTypes.ClientSystemMessage,
                 new ClientSystemMessageSerializer(),
                 new ClientSystemMessageHandler(server)
             );
             
             types.RegisterMessageType<ServerSystemMessage>(
-                (int)DefaultMessageTypes.ServerSystemMessage,
                 new ServerSystemMessageSerializer()
             );
 
             types.RegisterMessageType<ClientSecretMessage>(
-                (int)DefaultMessageTypes.ClientSecret,
                 new ClientSecretMessageSerializer()
+            );
+
+            types.RegisterMessageType<DisconnectMessage>(
+                new DisconnectMessageSerializer(),
+                new MessageActionHandler<DisconnectMessage>(server.HandleDisconnectMessage)
             );
         }
 

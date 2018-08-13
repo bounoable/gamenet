@@ -70,7 +70,7 @@ namespace GameNet
             Connected = true;
 
             Task.Run(() => ReceiveData(_tcpServer).ConfigureAwait(false));
-            Task.Run(() => Messenger.RequestPendingAcknowledgeResponses().ConfigureAwait(false));
+            Task.Run(() => Messenger.Start());
         }
 
         /// <summary>
@@ -83,13 +83,15 @@ namespace GameNet
         /// <summary>
         /// Close the connection to the server.
         /// </summary>
-        public void Disconnect()
+        async public void Disconnect()
         {
             if (!Connected) {
                 return;
             }
 
-            Messenger.StopRequestPendingAcknowlegeResponses();
+            await Send(new DisconnectMessage(Secret), ProtocolType.Udp);
+
+            Messenger.Stop();
             _tcpServer.Close();
             _tcpServer = null;
             _udpClient.Close();
@@ -118,14 +120,20 @@ namespace GameNet
             }
         }
 
+        public void HandleSecretMessage(ClientSecretMessage message)
+        {
+            Secret = message.Secret;
+            Task.Run(() => SendHeartbeatMessages());
+        }
+
         /// <summary>
         /// Periodically send a heartbeat message to the server.
         /// </summary>
-        async public Task SendHeartbeatMessages()
+        async Task SendHeartbeatMessages()
         {
             while (Connected && !string.IsNullOrEmpty(Secret)) {
-                await SendHeartbeatMessage();
                 await Task.Delay(Config.HeartbeatInterval);
+                await SendHeartbeatMessage();
             }
         }
 
@@ -133,13 +141,13 @@ namespace GameNet
         /// Send a still connected message to the server.
         /// </summary>
         Task<byte[]> SendHeartbeatMessage()
-            => Send(new ClientSystemMessage(ClientSystemMessage.MessageType.Heartbeat, Secret));
+            => Send(new ClientSystemMessage(ClientSystemMessage.MessageType.Heartbeat, Secret), ProtocolType.Udp);
 
         /// <summary>
         /// Register the server's UDP port.
         /// </summary>
         /// <param name="message">The UDP port message from the server.</param>
-        public void RegisterServerUdpPort(IUdpPortMessage message)
+        public void HandleUdpPortMessage(UdpPortMessage<Server> message)
         {
             _serverUdpEndpoint = (IPEndPoint)_tcpServer.Client.RemoteEndPoint;
             _serverUdpEndpoint.Port = message.Port;
@@ -165,7 +173,7 @@ namespace GameNet
         {
             switch (protocol) {
                 case ProtocolType.Udp:
-                    if (_serverUdpEndpoint == null)
+                    if (_serverUdpEndpoint == null) 
                         return new byte[0];
 
                     return await Messenger.SendBytes(_udpClient, _serverUdpEndpoint, data);
@@ -198,7 +206,6 @@ namespace GameNet
         /// Send an object to the server and return the written data.
         /// The object will automatically be serialized to a message by the registered serializer.
         /// </summary>
-        /// <param name="recipient">The recipient. Usually something like a TCP client.</param>
         /// <param name="object">The object to send.</param>
         /// <param name="protocol">The protocol to use.</param>
         /// <returns>The data that was sent.</returns>

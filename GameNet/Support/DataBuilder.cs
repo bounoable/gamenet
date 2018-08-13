@@ -32,7 +32,7 @@ namespace GameNet.Support
         /// <returns>The data builder.</returns>
         public DataBuilder Append(byte[] data)
         {
-            this.data.AddRange(data);
+            this.data.AddRange(ToLittleEndian(data));
 
             return this;
         }
@@ -142,22 +142,15 @@ namespace GameNet.Support
         /// <returns>The data builder.</returns>
         public DataBuilder String(string value)
         {   
-            int length = value == null ? 0 : value.Length;
+            int length = string.IsNullOrEmpty(value) ? 0 : value.Length;
 
             Int(length);
 
             return length > 0 ? Append(Encoding.Unicode.GetBytes(value)) : this;
         }
 
-        /// <summary>
-        /// Append an enum value to the data.
-        /// </summary>
-        /// <param name="value">The enum value to append.</param>
-        /// <returns>The data builder.</returns>
-        public DataBuilder Enum<T>(T value) where T: Enum
+        DataBuilder Enum(Type enumType, Enum value)
         {
-            Type enumType = System.Enum.GetUnderlyingType(typeof(T));
-
             if (enumType == typeof(short)) {
                 return Short((short)(object)value);
             }
@@ -184,5 +177,20 @@ namespace GameNet.Support
 
             return Int((int)(object)value);
         }
+
+        /// <summary>
+        /// Append an enum value to the data.
+        /// </summary>
+        /// <param name="value">The enum value to append.</param>
+        /// <returns>The data builder.</returns>
+        public DataBuilder Enum<T>(T value) where T: Enum
+            => Enum(typeof(T), value);
+
+        /// <summary>
+        /// Transform a byte array to little endian if the operating system uses big endian.
+        /// </summary>
+        /// <param name="data">The byte array.</param>
+        /// <returns>The corrected byte array.</returns>
+        public static byte[] ToLittleEndian(byte[] data) => BitConverter.IsLittleEndian ? data : data.Reverse().ToArray();
     }
 }

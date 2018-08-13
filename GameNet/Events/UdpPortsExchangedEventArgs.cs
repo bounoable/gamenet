@@ -5,13 +5,13 @@ namespace GameNet.Events
 {
     public class UdpPortsExchangedEventArgs: EventArgs
     {
-        public Player Client { get; }
-        public IPEndPoint ClientEndpoint => Client.UdpEndpoint;
-        public int ClientPort => ClientEndpoint.Port;
+        public Player Player { get; }
+        public IPEndPoint PlayerEndpoint => Player.UdpEndpoint;
+        public int PlayerPort => PlayerEndpoint.Port;
 
-        public UdpPortsExchangedEventArgs(Player client)
+        public UdpPortsExchangedEventArgs(Player player)
         {
-            Client = client;
+            Player = player;
         }
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Net;
 using System.Linq;
+using System.Text;
 using GameNet.Support;
 using GameNet.Messages;
 using System.Net.Sockets;
@@ -13,7 +14,7 @@ namespace GameNet.Protocol
 {
     public class Messenger: IDataHandler
     {
-        bool ShouldRequestPendingAckResponses { get; set; }
+        public bool Running { get; private set; } = false;
 
         public MessageTypeConfig TypeConfig { get; }
 
@@ -37,24 +38,24 @@ namespace GameNet.Protocol
         /// </summary>
         /// <param name="data">The received data.</param>
         /// <param name="recipient">The sender of the data.</param>
-        public void Handle(byte[] data, IRecipient sender)
+        async public void Handle(byte[] data, IRecipient sender)
         {
             // Check if the data contains at least the message type id.
             if (data.Length < sizeof(int))
                 return;
             
             IPacket packet = ParsePacket(data);
-            IMessageType type = TypeConfig.GetTypeById(packet.MessageTypeId);
+            IMessageType type = TypeConfig.GetTypeById(packet.MessageType);
 
             if (type == null || type.Serializer == null)
                 return;
 
-            object obj = type.Serializer.Deserialize(data.Skip(sizeof(int)).ToArray());
+            object obj = type.Serializer.Deserialize(packet.Payload);
 
             if (obj is IAcknowledgeRequest) {
                 var message = (IAcknowledgeRequest)obj;
 
-                Send(sender, new AcknowledgeResponse(message.AckToken));
+                await Send(sender, new AcknowledgeResponse(message.AckToken));
             }
 
             if (obj is IAcknowledgeResponse) {
@@ -73,17 +74,17 @@ namespace GameNet.Protocol
         /// <returns>The parsed message.</returns>
         IPacket ParsePacket(byte[] raw)
         {
-            int type = DataHelper.GetInt(raw);
-            byte[] data = raw.Skip(sizeof(int)).ToArray();
+            string type = DataHelper.GetString(raw);
+            byte[] payload = raw.Skip(type.Length * sizeof(char) + sizeof(int)).ToArray();
 
-            return new Packet(type, data);
+            return new Packet(type, payload);
         }
 
         /// <summary>
         /// Send data to a recipient and return the sent data.
         /// </summary>
         /// <param name="recipient">The recipient.</param>
-        /// <param name="data">The data to send.</param>
+        /// <param name="payload">The data to send.</param>
         /// <returns>The data that was sent.</returns>
         async public Task<byte[]> SendBytes(IRecipient recipient, byte[] data)
         {
@@ -158,7 +159,9 @@ namespace GameNet.Protocol
             if (obj is IAcknowledgeRequest) {
                 var request = (IAcknowledgeRequest)obj;
 
-                _pendingAcknowledgeRequests.TryAdd(request.AckToken, new PendingAcknowledgeRequest(request, recipient));
+                if (request.AckToken != null) {
+                    _pendingAcknowledgeRequests.TryAdd(request.AckToken, new PendingAcknowledgeRequest(request, recipient));
+                }
             }
 
             IPacket packet = CreatePacketFromObject(obj);
@@ -167,7 +170,13 @@ namespace GameNet.Protocol
                 return new byte[0];
             }
 
-            return await SendPacket(recipient, packet);
+            byte[] data = await SendPacket(recipient, packet);
+
+            if (obj is IAcknowledgeRequest) {
+                await WaitForAcknowledgeResponse((IAcknowledgeRequest)obj);
+            }
+
+            return data;
         }
         
         /// <summary>
@@ -206,15 +215,13 @@ namespace GameNet.Protocol
                 return null;
             }
 
-            byte[] data = type.Serializer.Serialize(obj);
+            byte[] payload = type.Serializer.Serialize(obj);
 
-            if (data == null) {
+            if (payload == null) {
                 return null;
             }
 
-            int typeId = TypeConfig.GetTypeId(type);
-
-            return new Packet(typeId, data);
+            return new Packet(type.Id, payload);
         }
 
         /// <summary>
@@ -224,26 +231,30 @@ namespace GameNet.Protocol
         /// <param name="packet">The packet to transform.</param>
         /// <returns>The prepared packet as a byte array.</returns>
         byte[] PreparePacket(IPacket packet)
-            => ToLittleEndian(BitConverter.GetBytes(packet.MessageTypeId))
-                .Concat(ToLittleEndian(packet.Payload))
-                .ToArray();
+            => new DataBuilder()
+                .String(packet.MessageType)
+                .Bytes(packet.Payload)
+                .Data;
+            
+        public void Start()
+        {
+            Running = true;
 
-        /// <summary>
-        /// Transform a byte array to little endian if the operating system uses big endian.
-        /// </summary>
-        /// <param name="data">The byte array.</param>
-        /// <returns>The corrected byte array.</returns>
-        byte[] ToLittleEndian(byte[] data) => BitConverter.IsLittleEndian ? data : data.Reverse().ToArray();
+            Task.Run(() => RequestPendingAcknowledgeResponses().ConfigureAwait(false));
+        }
+
+        public void Stop()
+        {
+            Running = false;
+        }
 
         /// <summary>
         /// Request acknowledge responses for the acknowledge
         /// messages that have not been responded to yet.
         /// </summary>
-        async public Task RequestPendingAcknowledgeResponses()
+        async Task RequestPendingAcknowledgeResponses()
         {
-            ShouldRequestPendingAckResponses = true;
-
-            while (ShouldRequestPendingAckResponses) {
+            while (Running) {
                 await Task.Delay(100);
 
                 if (_pendingAcknowledgeRequests.Count == 0)
@@ -275,11 +286,14 @@ namespace GameNet.Protocol
             }
         }
 
+        async Task WaitForAcknowledgeResponse(IAcknowledgeRequest request)
+        {
+            while (!IsAcknowledged(request)) {
+                await Task.Delay(10);
+            }
+        }
 
-        /// <summary>
-        /// Stop the resending of pending acknowledge messages.
-        /// </summary>
-        public void StopRequestPendingAcknowlegeResponses()
-            => ShouldRequestPendingAckResponses = false;
+        bool IsAcknowledged(IAcknowledgeRequest request)
+            => !_pendingAcknowledgeRequests.TryGetValue(request.AckToken, out PendingAcknowledgeRequest pending);
     }
 }

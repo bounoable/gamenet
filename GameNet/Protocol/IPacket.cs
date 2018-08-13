@@ -3,9 +3,9 @@ namespace GameNet.Protocol
     public interface IPacket
     {
         /// <summary>
-        /// The message type id.
+        /// The message type.
         /// </summary>
-        int MessageTypeId { get; }
+        string MessageType { get; }
 
         /// <summary>
         /// The packet payload.

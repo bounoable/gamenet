@@ -1,10 +1,14 @@
 using System;
 using System.Net;
+using System.Linq;
+using GameNet.Events;
+using GameNet.Support;
 using System.Threading;
 using GameNet.Protocol;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 
 namespace GameNet
 {
@@ -18,7 +22,7 @@ namespace GameNet
 
         protected UdpClient _udpClient;
 
-        HashSet<IDataHandler> _dataHandlers = new HashSet<IDataHandler>();
+        readonly HashSet<IDataHandler> _dataHandlers = new HashSet<IDataHandler>();
 
         /// <summary>
         /// Initialize an endpoint.
@@ -47,14 +51,34 @@ namespace GameNet
         {
             NetworkStream stream = client.GetStream();
 
-            while (ShouldReceiveData) {
-                if (stream.CanRead && stream.DataAvailable) {
-                    var data = new byte[client.ReceiveBufferSize];
+            if (!stream.CanRead)
+                return;
 
-                    await stream.ReadAsync(data, 0, client.ReceiveBufferSize);
-                    
-                    HandleReceivedData(data, new TcpRecipient(client));
+            while (ShouldReceiveData) {
+                var lengthBuffer = new byte[sizeof(int)];
+
+                if (await stream.ReadAsync(lengthBuffer, 0, sizeof(int)) == 0)
+                    continue;
+
+                int length = DataHelper.GetInt(lengthBuffer);
+                int receivedByteCount = 0;
+                var payload = new byte[0];
+
+                while (receivedByteCount < length) {
+                    int remaining = length - receivedByteCount;
+                    byte[] buffer = new byte[remaining];
+
+                    int received = await stream.ReadAsync(buffer, 0, remaining);
+                    receivedByteCount += received;
+
+                    if (received == 0) {
+                        return;
+                    }
+
+                    payload = payload.Concat(buffer.Take(received)).ToArray();
                 }
+
+                HandleReceivedData(payload.ToArray(), new TcpRecipient(client));
             }
         }
 

@@ -5,12 +5,12 @@ namespace GameNet.Events
 {
     public class PlayerDisconnectedEventArgs: EventArgs
     {
-        public Player Client { get; }
+        public Player Player { get; }
         public DateTime DisconnectedAt { get; } = DateTime.Now;
 
-        public PlayerDisconnectedEventArgs(Player client)
+        public PlayerDisconnectedEventArgs(Player player)
         {
-            Client = client;
+            Player = player;
         }
     }
 }

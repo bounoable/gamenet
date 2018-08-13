@@ -1,22 +1,16 @@
+using System;
+using System.Linq;
+using GameNet.Support;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Collections.Concurrent;
 
 namespace GameNet.Protocol
 {
-    public class TcpRecipient: IRecipient
+    public class TcpRecipient: StreamRecipient
     {
-        readonly TcpClient _client;
-
-        public TcpRecipient(TcpClient client)
-            => _client = client;
-
-        async public Task Send(byte[] data)
-        {
-            NetworkStream stream = _client.GetStream();
-            
-            if (stream.CanWrite) {
-                await _client.GetStream().WriteAsync(data, 0, data.Length);
-            }
-        }
+        public TcpRecipient(TcpClient client): base(client.GetStream())
+        {}
     }
 }
