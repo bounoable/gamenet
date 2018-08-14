@@ -1,16 +1,25 @@
 using System;
 using System.Net;
 using GameNet.Debug;
+using GameNet.Events;
+using GameNet.Support;
 using GameNet.Messages;
 using GameNet.Protocol;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using GameNet.Messages.Handlers;
 using System.Collections.Generic;
+using GameNet.Messages.Serializers;
 
 namespace GameNet
 {
     public class Client: Endpoint
     {
+        #region events
+        public event EventHandler<ConnectionEstablishedEventArgs> ConnectionEstablished = delegate {};
+        #endregion
+
+        #region properties
         /// <summary>
         /// The client configuration.
         /// </summary>
@@ -32,9 +41,12 @@ namespace GameNet
         /// Indicates if the client should receive data from the server.
         /// </summary>
         override protected bool ShouldReceiveData => Connected;
+        #endregion
 
+        #region fields
         TcpClient _tcpServer = new TcpClient();
         IPEndPoint _serverUdpEndpoint;
+        #endregion
 
         /// <summary>
         /// Initialize the client for a client-server-connection.
@@ -49,6 +61,33 @@ namespace GameNet
 
             Config = config;
             Messenger = messenger;
+
+            RegisterDefaultMessageTypes();
+            RegisterEventHandlers();
+        }
+
+        /// <summary>
+        /// Register the default message types.
+        /// </summary>
+        void RegisterDefaultMessageTypes()
+        {
+            MessageTypeConfig types = Messenger.TypeConfig;
+
+            types.RegisterMessageType<AcknowledgeResponse>(new AcknowledgeResponseSerializer());
+            types.RegisterMessageType<UdpPortMessage<Client>>(new UdpPortMessageSerializer<Client>());
+            types.RegisterMessageType<UdpPortMessage<Server>>(new UdpPortMessageSerializer<Server>(), HandleUdpPortMessage);
+            types.RegisterMessageType<ServerSystemMessage>(new ServerSystemMessageSerializer(), new ServerSystemMessageHandler(this));
+            types.RegisterMessageType<ClientSystemMessage>(new ClientSystemMessageSerializer());
+            types.RegisterMessageType<ClientSecretMessage>(new ClientSecretMessageSerializer(), HandleSecretMessage);
+            types.RegisterMessageType<DisconnectMessage>(new DisconnectMessageSerializer());
+        }
+
+        /// <summary>
+        /// Register the default event handlers.
+        /// </summary>
+        void RegisterEventHandlers()
+        {
+            ConnectionEstablished += (sender, args) => Task.Run(SendHeartbeatMessages).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -62,10 +101,15 @@ namespace GameNet
                 return;
             }
 
-            ValidateIPAddress(ipAddress);
-            ValidatePort(port);
+            Validator.ValidateIPAddress(ipAddress);
+            Validator.ValidatePort(port);
 
-            _tcpServer.Connect(ipAddress, port);
+            try {
+                _tcpServer.Connect(ipAddress, port);
+            } catch (Exception e) {
+                _tcpServer.Close();
+                throw e;
+            }
 
             Connected = true;
 
@@ -83,7 +127,7 @@ namespace GameNet
         /// <summary>
         /// Close the connection to the server.
         /// </summary>
-        async public void Disconnect()
+        async public Task Disconnect()
         {
             if (!Connected) {
                 return;
@@ -98,33 +142,14 @@ namespace GameNet
             Connected = false;
         }
 
-        /// <summary>
-        /// Validate an IP address.
-        /// </summary>
-        /// <param name="port">The IP address to validate.</param>
-        void ValidateIPAddress(IPAddress ipAddress)
-        {
-            if (ipAddress == null) {
-                throw new ArgumentNullException("Ip address cannot be null.");
-            }
-        }
-
-        /// <summary>
-        /// Validate a port number. It must be an integer between 1 and 65535.
-        /// </summary>
-        /// <param name="port">The port to validate.</param>
-        void ValidatePort(int port)
-        {
-            if (port < 1 || port > 65535) {
-                throw new ArgumentOutOfRangeException($"Invalid port ({port}). Port must be between 1 and 65535.");
-            }
-        }
-
         public void HandleSecretMessage(ClientSecretMessage message)
-        {
-            Secret = message.Secret;
-            Task.Run(() => SendHeartbeatMessages());
-        }
+            => Secret = message.Secret;
+
+        /// <summary>
+        /// Notify the client about the established connection to the server.
+        /// </summary>
+        public void NotifyConnectionEstablished()
+            => ConnectionEstablished(this, new ConnectionEstablishedEventArgs());
 
         /// <summary>
         /// Periodically send a heartbeat message to the server.

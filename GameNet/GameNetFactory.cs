@@ -76,7 +76,6 @@ namespace GameNet
             var messenger = new Messenger(types);
             var client = new Client(new ClientConfiguration(udpPort), messenger);
 
-            RegisterDefaultClientMessageTypes(client, types);
             RegisterUserMessageTypes(types);
 
             foreach (KeyValuePair<Type, IMessageType> item in _clientMessageTypes) {
@@ -101,7 +100,6 @@ namespace GameNet
             var messenger = new Messenger(types);
             var server = new Server(new ServerConfiguration(ipAddress, tcpPort, udpPort), messenger);
 
-            RegisterDefaultServerMessageTypes(server, types);
             RegisterUserMessageTypes(types);
 
             foreach (KeyValuePair<Type, IMessageType> item in _serverMessageTypes) {
@@ -122,84 +120,6 @@ namespace GameNet
         /// <returns>The game server.</returns>
         public Server CreateServer(string ipAddress, ushort tcpPort = ServerConfiguration.DEFAULT_PORT, ushort udpPort = ServerConfiguration.DEFAULT_UDP_PORT)
             => CreateServer(IPAddress.Parse(ipAddress), tcpPort, udpPort);
-        
-        /// <summary>
-        /// Register the default message types for a client.
-        /// </summary>
-        /// <param name="client">The client.</param>
-        /// <param name="types">The message type config.</param>
-        void RegisterDefaultClientMessageTypes(Client client, MessageTypeConfig types)
-        {
-            types.RegisterMessageType<AcknowledgeResponse>(
-                new AcknowledgeResponseSerializer()
-            );
-
-            types.RegisterMessageType<UdpPortMessage<Client>>(
-                new UdpPortMessageSerializer<Client>()
-            );
-
-            types.RegisterMessageType<UdpPortMessage<Server>>(
-                new UdpPortMessageSerializer<Server>(),
-                new MessageActionHandler<UdpPortMessage<Server>>(client.HandleUdpPortMessage)
-            );
-
-            types.RegisterMessageType<ServerSystemMessage>(
-                new ServerSystemMessageSerializer(),
-                new ServerSystemMessageHandler(client)
-            );
-
-            types.RegisterMessageType<ClientSystemMessage>(
-                new ClientSystemMessageSerializer()
-            );
-
-            types.RegisterMessageType<ClientSecretMessage>(
-                new ClientSecretMessageSerializer(),
-                new MessageActionHandler<ClientSecretMessage>(client.HandleSecretMessage)
-            );
-
-            types.RegisterMessageType<DisconnectMessage>(
-                new DisconnectMessageSerializer()
-            );
-        }
-
-        /// <summary>
-        /// Register the default message types for a server.
-        /// </summary>
-        /// <param name="server">The server.</param>
-        /// <param name="types">The message type config.</param>
-        void RegisterDefaultServerMessageTypes(Server server, MessageTypeConfig types)
-        {
-            types.RegisterMessageType<AcknowledgeResponse>(
-                new AcknowledgeResponseSerializer()
-            );
-
-            types.RegisterMessageType<UdpPortMessage<Server>>(
-                new UdpPortMessageSerializer<Server>()
-            );
-
-            types.RegisterMessageType<UdpPortMessage<Client>>(
-                new UdpPortMessageSerializer<Client>(),
-                new MessageActionHandler<UdpPortMessage<Client>>(server.HandleUdpPortMessage)
-            );
-
-            types.RegisterMessageType<ClientSystemMessage>(
-                new ClientSystemMessageSerializer(),
-                new ClientSystemMessageHandler(server)
-            );
-            
-            types.RegisterMessageType<ServerSystemMessage>(
-                new ServerSystemMessageSerializer()
-            );
-
-            types.RegisterMessageType<ClientSecretMessage>(
-                new ClientSecretMessageSerializer()
-            );
-
-            types.RegisterMessageType<DisconnectMessage>(
-                new DisconnectMessageSerializer(),
-                new MessageActionHandler<DisconnectMessage>(server.HandleDisconnectMessage)
-            );
-        }
 
         /// <summary>
         /// Register the user registered message types in a message type config.

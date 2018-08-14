@@ -3,17 +3,29 @@ using System.Net;
 using System.Linq;
 using GameNet.Debug;
 using GameNet.Events;
+using GameNet.Support;
 using System.Threading;
 using GameNet.Messages;
 using GameNet.Protocol;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using GameNet.Messages.Handlers;
 using System.Collections.Generic;
+using GameNet.Messages.Serializers;
 
 namespace GameNet
 {
     public class Server: Endpoint
     {
+        #region events
+        public event Action ServerStarted = delegate {};
+        public event Action ServerStopped = delegate {};
+        public event EventHandler<PlayerConnectedEventArgs> PlayerConnected = delegate {};
+        public event EventHandler<PlayerDisconnectedEventArgs> PlayerDisconnected = delegate {};
+        public event EventHandler<UdpPortsExchangedEventArgs> UdpPortsExchanged = delegate {};
+        #endregion
+
+        #region properties
         public ServerConfiguration Config { get; }
         public IPAddress IPAddress => Config.IPAddress;
         public int Port => Config.Port;
@@ -21,6 +33,7 @@ namespace GameNet
         public Messenger Messenger { get; }
 
         override protected bool ShouldReceiveData => Active;
+        bool AcceptsClients => Active;
 
         public IEnumerable<TcpClient> TcpClients => _players.Values
             .Select(container => container.TcpClient);
@@ -28,19 +41,14 @@ namespace GameNet
         public IEnumerable<IPEndPoint> UdpEndpoints => _players.Values
             .Select(container => container.UdpEndpoint)
             .Where(endpoint => endpoint != null);
-
-        #region events
-        public event EventHandler<PlayerConnectedEventArgs> PlayerConnected = delegate {};
-        public event EventHandler<PlayerDisconnectedEventArgs> PlayerDisconnected = delegate {};
-        public event EventHandler<UdpPortsExchangedEventArgs> UdpPortsExchanged = delegate {};
         #endregion
 
+        #region fields
         TcpListener _listener;
 
         protected Dictionary<int, Player> _players = new Dictionary<int, Player>();
         int nextClientId = 0;
-
-        bool AcceptsClients => Active;
+        #endregion
 
         /// <summary>
         /// Initialize a server.
@@ -49,11 +57,14 @@ namespace GameNet
         /// <param name="messenger">The messenger.</param>
         public Server(ServerConfiguration config, Messenger messenger): base(config)
         {
-            ValidateIPAddress(config.IPAddress);
-            ValidatePort(config.Port);
+            Validator.ValidateIPAddress(config.IPAddress);
+            Validator.ValidatePort(config.Port);
 
             Config = config;
             Messenger = messenger;
+
+            RegisterDefaultMessageTypes();
+            RegisterEventHandlers();
         }
 
         /// <summary>
@@ -70,25 +81,29 @@ namespace GameNet
         {}
 
         /// <summary>
-        /// Validate an IP address.
+        /// Register the default message types.
         /// </summary>
-        /// <param name="port">The IP address to validate.</param>
-        void ValidateIPAddress(IPAddress ipAddress)
+        void RegisterDefaultMessageTypes()
         {
-            if (ipAddress == null) {
-                throw new ArgumentNullException("Ip address cannot be null.");
-            }
+            MessageTypeConfig types = Messenger.TypeConfig;
+
+            types.RegisterMessageType<AcknowledgeResponse>(new AcknowledgeResponseSerializer());
+            types.RegisterMessageType<UdpPortMessage<Server>>(new UdpPortMessageSerializer<Server>());
+            types.RegisterMessageType<UdpPortMessage<Client>>(new UdpPortMessageSerializer<Client>(), HandleUdpPortMessage);
+            types.RegisterMessageType<ClientSystemMessage>(new ClientSystemMessageSerializer(), new ClientSystemMessageHandler(this));
+            types.RegisterMessageType<ServerSystemMessage>(new ServerSystemMessageSerializer());
+            types.RegisterMessageType<ClientSecretMessage>(new ClientSecretMessageSerializer());
+            types.RegisterMessageType<DisconnectMessage>(new DisconnectMessageSerializer(), HandleDisconnectMessage);
         }
 
         /// <summary>
-        /// Validate a port number. It must be an integer between 1 and 65535.
+        /// Register the default event handlers.
         /// </summary>
-        /// <param name="port">The port to validate.</param>
-        void ValidatePort(int port)
+        void RegisterEventHandlers()
         {
-            if (port < 1 || port > 65535) {
-                throw new ArgumentOutOfRangeException($"Invalid port ({port}). Port must be between 1 and 65535.");
-            }
+            UdpPortsExchanged += (sender, args) => {
+                SendTo(args.Player, new ServerSystemMessage(ServerSystemMessage.MessageType.ConnectionEstablished)).ConfigureAwait(false);
+            };
         }
 
         /// <summary>
@@ -97,6 +112,7 @@ namespace GameNet
         public void Start()
         {
             _listener = new TcpListener(IPAddress, Port);
+            _listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, 1);
             _listener.Start();
 
             Active = true;
@@ -104,6 +120,8 @@ namespace GameNet
             Task.Run(() => AcceptClients().ConfigureAwait(false));
             Task.Run(() => KickDisconnectedPlayers().ConfigureAwait(false));
             Task.Run(() => Messenger.Start());
+
+            ServerStarted();
         }
 
         /// <summary>
@@ -111,15 +129,12 @@ namespace GameNet
         /// </summary>
         public void Stop()
         {
-            Active = false;
-
-            RemovePlayers();
-
             Messenger.Stop();
+            Active = false;
+            RemovePlayers();
+            _listener?.Stop();
 
-            if (_listener != null) {
-                _listener.Stop();
-            }
+            ServerStopped();
         }
 
         /// <summary>
@@ -185,11 +200,12 @@ namespace GameNet
         /// <param name="player">The player.</param>
         public void RemovePlayer(Player player)
         {
-            try {
-                player?.TcpClient?.GetStream()?.Close();
-                player?.TcpClient?.Close();
-            } catch (Exception e) {
+            if (player == null)
                 return;
+            
+            if (player.TcpClient != null) {
+                player.TcpClient.GetStream().Close();
+                player.TcpClient.Close();
             }
 
             int id = -1;

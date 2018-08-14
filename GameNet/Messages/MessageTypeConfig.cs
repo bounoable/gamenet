@@ -31,10 +31,27 @@ namespace GameNet.Messages
         /// Register a message type.
         /// </summary>
         /// <param name="serializer">The object serializer.</param>
+        /// <typeparam name="T">The object type of the messages.</typeparam>
+        public void RegisterMessageType<T>(IObjectSerializer serializer)
+            => RegisterMessageType<T>(new MessageType<T>(serializer));
+        
+        /// <summary>
+        /// Register a message type.
+        /// </summary>
+        /// <param name="serializer">The object serializer.</param>
         /// <param name="handler">The message handler.</param>
         /// <typeparam name="T">The object type of the messages.</typeparam>
-        public void RegisterMessageType<T>(IObjectSerializer serializer = null, IMessageHandler handler = null)
+        public void RegisterMessageType<T>(IObjectSerializer serializer, IMessageHandler handler)
             => RegisterMessageType<T>(new MessageType<T>(serializer, handler));
+        
+        /// <summary>
+        /// Register a message type.
+        /// </summary>
+        /// <param name="serializer">The object serializer.</param>
+        /// <param name="handler">The message handler.</param>
+        /// <typeparam name="T">The object type of the messages.</typeparam>
+        public void RegisterMessageType<T>(IObjectSerializer serializer = null, Action<T> handler = null) where T: class
+            => RegisterMessageType<T>(serializer, new MessageActionHandler<T>(handler));
 
         /// <summary>
         /// Get a message type by it's object type.

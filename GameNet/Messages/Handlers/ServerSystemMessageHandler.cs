@@ -1,3 +1,5 @@
+using GameNet.Events;
+
 namespace GameNet.Messages.Handlers
 {
     public class ServerSystemMessageHandler: MessageHandler<ServerSystemMessage>
@@ -11,7 +13,11 @@ namespace GameNet.Messages.Handlers
 
         override protected void HandleMessage(ServerSystemMessage message)
         {
-            switch (message.Type) {}
+            switch (message.Type) {
+                case ServerSystemMessage.MessageType.ConnectionEstablished:
+                    _client.NotifyConnectionEstablished();
+                    break;
+            }
         }
     }
 }
