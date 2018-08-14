@@ -23,6 +23,7 @@ namespace GameNet
         public event EventHandler<PlayerConnectedEventArgs> PlayerConnected = delegate {};
         public event EventHandler<PlayerDisconnectedEventArgs> PlayerDisconnected = delegate {};
         public event EventHandler<UdpPortsExchangedEventArgs> UdpPortsExchanged = delegate {};
+        public event EventHandler<ConnectionEstablishedEventArgs> ConnectionEstablished = delegate {};
         #endregion
 
         #region properties
@@ -101,8 +102,9 @@ namespace GameNet
         /// </summary>
         void RegisterEventHandlers()
         {
-            UdpPortsExchanged += (sender, args) => {
-                SendTo(args.Player, new ServerSystemMessage(ServerSystemMessage.MessageType.ConnectionEstablished)).ConfigureAwait(false);
+            UdpPortsExchanged += async (sender, args) => {
+                await SendTo(args.Player, new ServerSystemMessage(ServerSystemMessage.MessageType.ConnectionEstablished)).ConfigureAwait(false);
+                ConnectionEstablished(this, new ConnectionEstablishedEventArgs());
             };
         }
 
