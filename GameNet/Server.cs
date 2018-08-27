@@ -23,7 +23,6 @@ namespace GameNet
         public event EventHandler<PlayerConnectedEventArgs> PlayerConnected = delegate {};
         public event EventHandler<PlayerDisconnectedEventArgs> PlayerDisconnected = delegate {};
         public event EventHandler<UdpPortsExchangedEventArgs> UdpPortsExchanged = delegate {};
-        public event EventHandler<ConnectionEstablishedEventArgs> ConnectionEstablished = delegate {};
         #endregion
 
         #region properties
@@ -104,7 +103,6 @@ namespace GameNet
         {
             UdpPortsExchanged += async (sender, args) => {
                 await SendTo(args.Player, new ServerSystemMessage(ServerSystemMessage.MessageType.ConnectionEstablished)).ConfigureAwait(false);
-                ConnectionEstablished(this, new ConnectionEstablishedEventArgs());
             };
         }
 
@@ -191,8 +189,8 @@ namespace GameNet
         /// </summary>
         public void RemovePlayers()
         {
-            for (int i = 0; i < _players.Count; i++) {
-                RemovePlayer(_players[i]);
+            foreach (Player player in _players.Values) {
+                RemovePlayer(player);
             }
         }
 
@@ -220,7 +218,7 @@ namespace GameNet
                 break;
             }
 
-            if (id > -1) {
+            if (id > -1 && _players.ContainsKey(id)) {
                 _players.Remove(id);
             }
         }
